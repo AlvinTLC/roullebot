@@ -69,10 +69,13 @@ class Calibrator:
         print("=" * 50)
         print("1. Se abrirá una ventana mostrando Chrome")
         print("2. Haz click en las áreas que se te indiquen")
-        print("3. Presiona 'q' para salir, 's' para guardar")
+        print("3. Presiona 't' para probar coordenadas, 's' para guardar, 'q' para salir")
         
         try:
             chrome_region = obtener_region_chrome()
+            print(f"\n🔍 DEBUG CHROME REGION:")
+            print(f"   left={chrome_region['left']}, top={chrome_region['top']}")
+            print(f"   width={chrome_region['width']}, height={chrome_region['height']}")
         except Exception as e:
             print(f"❌ Error: {e}")
             return
@@ -96,19 +99,29 @@ class Calibrator:
         def mouse_callback(event, x, y, flags, param):
             nonlocal current_task
             if event == cv2.EVENT_LBUTTONDOWN:
-                # Convertir coordenadas relativas a absolutas
+                # IMPORTANTE: Las coordenadas x,y ya son absolutas de la pantalla
+                # porque estamos capturando la región completa de Chrome
+                
+                # Las coordenadas del click son relativas a la ventana CV
+                # Necesitamos convertirlas a coordenadas absolutas de pantalla
                 abs_x = chrome_region['left'] + x
                 abs_y = chrome_region['top'] + y
                 
+                # Mostrar información detallada para debug
+                print(f"\n🖱️  CLICK DETECTADO:")
+                print(f"   Coordenadas en ventana CV: ({x}, {y})")
+                print(f"   Chrome región: left={chrome_region['left']}, top={chrome_region['top']}")
+                print(f"   Coordenadas absolutas calculadas: ({abs_x}, {abs_y})")
+                
                 clicks.append({
                     'task': tasks[current_task],
-                    'x': x,
-                    'y': y,
-                    'abs_x': abs_x,
+                    'rel_x': x,  # Relativas a la ventana
+                    'rel_y': y,
+                    'abs_x': abs_x,  # Absolutas de pantalla
                     'abs_y': abs_y
                 })
                 
-                print(f"✅ {tasks[current_task]}: x={abs_x}, y={abs_y}")
+                print(f"✅ {tasks[current_task]}: ABSOLUTO=({abs_x}, {abs_y})")
                 current_task += 1
                 
                 if current_task >= len(tasks):
@@ -145,7 +158,15 @@ class Calibrator:
             
             # Mostrar clicks anteriores con cuadrados de selección
             for i, click in enumerate(clicks):
-                color = (0, 255, 0) if i < 2 else (255, 0, 0)  # Verde para regiones, rojo para apuestas
+                # Colores según tipo de calibración
+                if i < 2:  # Winner y Countdown
+                    color = (0, 255, 0)
+                elif i < 5:  # Balance, Total Bet, Repeat
+                    color = (255, 255, 0)  # Amarillo para regiones de info
+                elif i < 8:  # Números de apuesta
+                    color = (255, 0, 0)    # Rojo para posiciones de apuesta
+                else:  # Fichas
+                    color = (255, 0, 255)  # Magenta para fichas
                 
                 # Determinar tamaño del cuadrado según el tipo
                 if i == 0:  # Winner region
@@ -154,23 +175,37 @@ class Calibrator:
                 elif i == 1:  # Countdown region
                     countdown_width, countdown_height = config.get_optimal_countdown_size()
                     rect_w, rect_h = countdown_width//2, countdown_height//2
-                else:  # Bet positions
+                elif i in [2, 3]:  # Balance, Total Bet
+                    rect_w, rect_h = 80, 25
+                elif i == 4:  # Repeat button
+                    rect_w, rect_h = 40, 20
+                else:  # Bet positions y fichas
                     rect_w, rect_h = 15, 15
+                
+                # Usar coordenadas relativas para dibujar en la ventana
+                click_x = click['rel_x']
+                click_y = click['rel_y']
                 
                 # Dibujar cuadrado de selección
                 cv2.rectangle(img, 
-                            (click['x'] - rect_w, click['y'] - rect_h),
-                            (click['x'] + rect_w, click['y'] + rect_h),
+                            (click_x - rect_w, click_y - rect_h),
+                            (click_x + rect_w, click_y + rect_h),
                             color, 2)
                 
                 # Círculo central
-                cv2.circle(img, (click['x'], click['y']), 3, color, -1)
+                cv2.circle(img, (click_x, click_y), 3, color, -1)
                 
-                # Etiqueta
-                labels = ["WINNER", "COUNTDOWN", "BET 24", "BET 0", "BET 12"]
-                label = labels[i] if i < len(labels) else f"BET {i-2}"
-                cv2.putText(img, label, (click['x']+rect_w+5, click['y']-5),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                # Etiquetas mejoradas
+                labels = ["WINNER", "COUNTDOWN", "BALANCE", "TOTAL BET", "REPEAT", 
+                         "BET 24", "BET 0", "BET 12", "CHIP $1", "CHIP $5", "CHIP $25"]
+                label = labels[i] if i < len(labels) else f"ITEM {i+1}"
+                cv2.putText(img, label, (click_x+rect_w+5, click_y-5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                
+                # Mostrar coordenadas absolutas
+                cv2.putText(img, f"({click['abs_x']},{click['abs_y']})", 
+                           (click_x+rect_w+5, click_y+10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1)
             
             cv2.imshow('Calibración Visual', img)
             
@@ -178,6 +213,18 @@ class Calibrator:
             if key == ord('q'):
                 print("❌ Calibración cancelada")
                 break
+            elif key == ord('t'):
+                # Test: mostrar dónde haríamos click con las coordenadas actuales
+                print("\n🧪 TEST DE COORDENADAS:")
+                for i, click in enumerate(clicks):
+                    mouse_x, mouse_y = click['abs_x'], click['abs_y']
+                    print(f"   {i+1}. {click['task']}: ({mouse_x}, {mouse_y})")
+                    # Mover mouse a esa posición para verificar
+                    pyautogui.moveTo(mouse_x, mouse_y)
+                    import time
+                    time.sleep(0.5)
+                print("✅ Revisa si el mouse se posicionó correctamente en cada punto")
+                
             elif key == ord('s') and len(clicks) >= 3:
                 # Usar tamaños óptimos según resolución
                 optimal_width, optimal_height = config.get_optimal_capture_size()
