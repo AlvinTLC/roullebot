@@ -9,6 +9,7 @@ Bot automatizado para apostar en ruleta online, compatible con Windows, macOS y 
 - 🎮 **Apuestas Automáticas**: Realiza apuestas automáticas después de detectar ganadores
 - 📊 **Estadísticas**: Rastrea ganancias, pérdidas y tasa de éxito
 - 🔧 **Calibración Visual**: Sistema de calibración intuitivo por clicks
+- 🎯 **Precisión Exacta**: Mode run usa el mismo approach de ajuste de regiones que el calibrador
 - 🚀 **Alto Rendimiento**: ~50 FPS de detección
 
 ## 📋 Requisitos Previos

@@ -426,6 +426,10 @@ def main():
     preview_fps_counter = 0
     preview_fps_start_time = time.time()
     preview_fps_actual = 0
+    
+    # Variables para regiones ajustadas (disponibles para preview)
+    adjusted_winner_region = None
+    adjusted_countdown_region = None
 
     try:
         while True:
@@ -437,8 +441,23 @@ def main():
                     # Optimización: Saltear frames según configuración
                     if contador_scans % skip_frames == 0:
                         
-                        # Capturar región del número ganador (WINNER REGION)
-                        screenshot = capture_screen(region_numero)
+                        # Capturar región del número ganador (WINNER REGION) - USANDO MISMO APPROACH DEL CALIBRADOR
+                        # Ajustar región para centrarla mejor (igual que en calibrator.py)
+                        center_x = region_numero['x'] + region_numero['width'] // 2
+                        center_y = region_numero['y'] + region_numero['height'] // 2
+                        
+                        # Usar tamaño optimizado según resolución (igual que calibrador)
+                        optimal_width, optimal_height = config.get_optimal_capture_size()
+                        
+                        # Actualizar variable global para preview
+                        adjusted_winner_region = {
+                            'left': center_x - optimal_width // 2,
+                            'top': center_y - optimal_height // 2,
+                            'width': optimal_width,
+                            'height': optimal_height
+                        }
+                        
+                        screenshot = capture_screen(adjusted_winner_region)
                         img_ganador = np.array(screenshot)
                         
                         numero_ganador = ""
@@ -452,7 +471,22 @@ def main():
                         # Capturar countdown a la MISMA frecuencia para sincronizar preview
                         if region_countdown:  # Sin reducir frecuencia para mejor sync
                             try:
-                                screenshot_countdown = capture_screen(region_countdown)
+                                # Ajustar región countdown igual que en calibrador
+                                countdown_center_x = region_countdown['x'] + region_countdown['width'] // 2
+                                countdown_center_y = region_countdown['y'] + region_countdown['height'] // 2
+                                
+                                # Usar tamaño optimizado para countdown
+                                countdown_width, countdown_height = config.get_optimal_countdown_size()
+                                
+                                # Actualizar variable global para preview
+                                adjusted_countdown_region = {
+                                    'left': countdown_center_x - countdown_width // 2,
+                                    'top': countdown_center_y - countdown_height // 2,
+                                    'width': countdown_width,
+                                    'height': countdown_height
+                                }
+                                
+                                screenshot_countdown = capture_screen(adjusted_countdown_region)
                                 img_countdown = np.array(screenshot_countdown)
                                 if img_countdown is not None and img_countdown.size > 0:
                                     countdown_str = detect_number_from_image(img_countdown).strip()
@@ -481,10 +515,10 @@ def main():
             
             contador_scans += 1
 
-            # Preview mejorado - MUESTRA LA REGIÓN WINNER CALIBRADA
+            # Preview mejorado - MUESTRA LA REGIÓN WINNER AJUSTADA (igual que calibrador)
             if (current_time - last_preview_time) >= preview_interval and 'img_ganador' in locals():
                 if img_ganador is not None:
-                    # Convertir a BGR para cv2 - img_ganador viene de region_numero (WINNER REGION)
+                    # Convertir a BGR para cv2 - img_ganador viene de adjusted_winner_region (AJUSTADA)
                     img_bgr = cv2.cvtColor(img_ganador, cv2.COLOR_RGB2BGR)
                     
                     # Preview más grande y centrado
@@ -507,10 +541,14 @@ def main():
                     # Convertir countdown a string para verificación
                     current_countdown_str = str(current_countdown) if current_countdown is not None else None
                     
+                    # Título indicativo de región ajustada
+                    cv2.putText(display_img, "CALIBRATOR-STYLE ADJUSTED REGION", (15, 290), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    
                     # Winner detectado (grande y prominente)
                     current_winner_str = str(current_winner) if current_winner is not None else ""
                     winner_color = (0, 255, 0) if current_winner_str and current_winner_str.isdigit() else (0, 0, 255)
-                    cv2.putText(display_img, f"WINNER: {current_winner or 'N/A'}", (15, 310), 
+                    cv2.putText(display_img, f"WINNER: {current_winner or 'N/A'}", (15, 315), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, winner_color, 2)
                     
                     # Countdown (prominente con estado de apuesta)
@@ -529,21 +567,21 @@ def main():
                         countdown_color = (255, 255, 0)
                         countdown_text = f"COUNTDOWN: {current_countdown_str or 'N/A'}"
                     
-                    cv2.putText(display_img, countdown_text, (15, 340), 
+                    cv2.putText(display_img, countdown_text, (15, 345), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, countdown_color, 2)
                     
                     # Target actual
                     target_color = (255, 0, 255) if detector.modo_aleatorio else (255, 255, 255)
                     mode_text = "RANDOM" if detector.modo_aleatorio else "FIXED"
-                    cv2.putText(display_img, f"TARGET: {detector.numero_objetivo} ({mode_text})", (15, 370), 
+                    cv2.putText(display_img, f"TARGET: {detector.numero_objetivo} ({mode_text})", (15, 375), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, target_color, 1)
                     
                     # Estadísticas (lado derecho)
-                    cv2.putText(display_img, f"Bets: {detector.total_apuestas}", (220, 310), 
+                    cv2.putText(display_img, f"Bets: {detector.total_apuestas}", (220, 315), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                    cv2.putText(display_img, f"Winners: {len(detector.historial_ganadores)}", (220, 330), 
+                    cv2.putText(display_img, f"Winners: {len(detector.historial_ganadores)}", (220, 335), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                    cv2.putText(display_img, f"Detections: {detector.contador_detecciones_validas}", (220, 350), 
+                    cv2.putText(display_img, f"Detections: {detector.contador_detecciones_validas}", (220, 355), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
                     # Estado de apuestas (centro inferior)
@@ -580,25 +618,34 @@ def main():
                             color = (200, 200, 200)
                             status_text = "Waiting for winner..."
                     
-                    cv2.putText(display_img, status_text, (15, 400), 
+                    cv2.putText(display_img, status_text, (15, 405), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
                     # FPS y región info en esquina inferior derecha
                     if contador_scans > 100:
                         duracion_actual = time.time() - detector.inicio_sesion
                         fps_actual = contador_scans / duracion_actual
-                        cv2.putText(display_img, f"FPS: {fps_actual:.1f}", (320, 370), 
+                        cv2.putText(display_img, f"FPS: {fps_actual:.1f}", (320, 375), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                     
                     # Último ganador si existe
                     if len(detector.historial_ganadores) > 0:
                         ultimo_ganador = detector.historial_ganadores[-1][1]
-                        cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 385), 
+                        cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 390), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
                     
-                    # Mostrar qué región está viendo el preview
-                    cv2.putText(display_img, f"Region: Winner ({region_numero['width']}x{region_numero['height']})", (220, 415), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 200, 100), 1)
+                    # Mostrar qué región está viendo el preview (AJUSTADA igual que calibrador)
+                    if adjusted_winner_region:
+                        cv2.putText(display_img, f"ADJUSTED Winner: {adjusted_winner_region['width']}x{adjusted_winner_region['height']}", (220, 420), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                        cv2.putText(display_img, f"Pos: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']})", (220, 435), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 1)
+                        # Mostrar comparación con región original
+                        cv2.putText(display_img, f"Original: {region_numero['width']}x{region_numero['height']} at ({region_numero['x']},{region_numero['y']})", (10, 450), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128, 128, 128), 1)
+                    else:
+                        cv2.putText(display_img, f"Region: Winner ({region_numero['width']}x{region_numero['height']})", (220, 420), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 200, 100), 1)
                     
                     # Calcular FPS real del preview
                     preview_fps_counter += 1
@@ -608,7 +655,7 @@ def main():
                         preview_fps_start_time = current_time
                     
                     # Mostrar FPS del preview
-                    cv2.putText(display_img, f"Preview: {preview_fps_actual} FPS", (320, 390), 
+                    cv2.putText(display_img, f"Preview: {preview_fps_actual} FPS", (320, 395), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 255, 100), 1)
 
                     cv2.imshow("RouletteBot - Live Preview", display_img)
