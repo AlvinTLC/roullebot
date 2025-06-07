@@ -32,13 +32,65 @@ class MultiOCREngine:
         # 1. EasyOCR (Mejor para números pequeños y gaming)
         try:
             import easyocr
-            self.engines['easyocr'] = easyocr.Reader(['en'], gpu=False, verbose=False)
-            self.available_engines.append('easyocr')
-            print("✅ EasyOCR inicializado (Recomendado para gaming)")
+            import os
+            import tempfile
+            
+            # Intentar configurar directorio temporal para modelos en Windows
+            if os.name == 'nt':  # Windows
+                try:
+                    # Crear directorio temporal para EasyOCR en ubicación accesible
+                    temp_dir = os.path.join(tempfile.gettempdir(), 'easyocr_models')
+                    os.makedirs(temp_dir, exist_ok=True)
+                    os.environ['EASYOCR_MODULE_PATH'] = temp_dir
+                    print(f"📁 Configurando EasyOCR para Windows: {temp_dir}")
+                except Exception as dir_error:
+                    print(f"⚠️ No se pudo configurar directorio EasyOCR: {dir_error}")
+            
+            # Intentar inicializar con múltiples configuraciones
+            initialization_attempts = [
+                # Intento 1: Configuración completa
+                {'lang_list': ['en'], 'gpu': False, 'verbose': False, 'download_enabled': True},
+                # Intento 2: Configuración mínima
+                {'lang_list': ['en'], 'gpu': False, 'verbose': False},
+                # Intento 3: Solo parámetros esenciales
+                (['en'],),
+            ]
+            
+            reader_initialized = False
+            for i, config in enumerate(initialization_attempts, 1):
+                try:
+                    print(f"🔄 Intentando inicializar EasyOCR (método {i}/3)...")
+                    
+                    if isinstance(config, dict):
+                        self.engines['easyocr'] = easyocr.Reader(**config)
+                    else:
+                        self.engines['easyocr'] = easyocr.Reader(*config)
+                    
+                    reader_initialized = True
+                    break
+                    
+                except Exception as config_error:
+                    print(f"   ❌ Método {i} falló: {config_error}")
+                    if i < len(initialization_attempts):
+                        print(f"   🔄 Probando método {i+1}...")
+                    continue
+            
+            if reader_initialized:
+                self.available_engines.append('easyocr')
+                print("✅ EasyOCR inicializado (Recomendado para gaming)")
+            else:
+                raise Exception("Todos los métodos de inicialización fallaron")
         except ImportError:
             print("⚠️ EasyOCR no disponible - instala con: pip install easyocr")
+        except FileNotFoundError as fnf_error:
+            print(f"⚠️ EasyOCR: Error de archivos/patrones - {fnf_error}")
+            print("💡 Posible solución: Reinstalar EasyOCR o verificar permisos")
+        except PermissionError as perm_error:
+            print(f"⚠️ EasyOCR: Error de permisos - {perm_error}")
+            print("💡 Posible solución: Ejecutar como administrador o cambiar directorio")
         except Exception as e:
             print(f"⚠️ Error inicializando EasyOCR: {e}")
+            print("💡 Continuando con otros motores OCR...")
             
         # 2. PaddleOCR (Muy rápido y preciso)
         try:
@@ -77,6 +129,45 @@ class MultiOCREngine:
             print(f"📋 Motores disponibles: {', '.join([e.upper() for e in self.available_engines])}")
         else:
             print("❌ ¡No hay motores OCR disponibles!")
+            print("💡 Para Windows con problemas de EasyOCR:")
+            print("   1. Reinstalar: pip uninstall easyocr && pip install easyocr")
+            print("   2. Ejecutar como administrador")
+            print("   3. Verificar conexión a internet para descarga de modelos")
+    
+    def retry_easyocr_initialization(self):
+        """Reintenta inicializar EasyOCR manualmente (útil para Windows)"""
+        if 'easyocr' in self.available_engines:
+            print("⚠️ EasyOCR ya está inicializado")
+            return True
+            
+        print("🔄 Reintentando inicialización manual de EasyOCR...")
+        
+        try:
+            import easyocr
+            import os
+            
+            # Configuración especial para Windows
+            if os.name == 'nt':
+                # Configurar variables de entorno
+                os.environ['TORCH_HOME'] = os.path.join(os.path.expanduser('~'), '.torch')
+                print(f"📁 TORCH_HOME: {os.environ.get('TORCH_HOME')}")
+            
+            # Intento manual más simple
+            print("🔄 Inicializando EasyOCR con configuración mínima...")
+            reader = easyocr.Reader(['en'])
+            
+            self.engines['easyocr'] = reader
+            self.available_engines.append('easyocr')
+            
+            if not self.current_engine:
+                self.current_engine = 'easyocr'
+                
+            print("✅ EasyOCR inicializado exitosamente en reintento manual")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Reintento manual falló: {e}")
+            return False
             
     def detect_number_easyocr(self, img: np.ndarray) -> str:
         """Detección con EasyOCR"""
