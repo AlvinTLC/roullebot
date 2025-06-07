@@ -450,49 +450,20 @@ def main():
                     # Optimización: Saltear frames según configuración
                     if contador_scans % skip_frames == 0:
                         
-                        # Capturar región del número ganador (WINNER REGION) - USANDO MISMO APPROACH DEL CALIBRADOR
-                        # Ajustar región para centrarla mejor (igual que en calibrator.py)
-                        center_x = region_numero['x'] + region_numero['width'] // 2
-                        center_y = region_numero['y'] + region_numero['height'] // 2
-                        
-                        # Usar tamaño optimizado según resolución (igual que calibrador)
-                        # NOTA: En Windows 2K, usar el tamaño ya escalado de la calibración
-                        if config.is_windows and config.resolution_info['is_2k']:
-                            # Usar el tamaño ya escalado
-                            optimal_width = region_numero['width']
-                            optimal_height = region_numero['height']
-                            print(f"🔧 Usando tamaño escalado para 2K: {optimal_width}x{optimal_height}")
-                        else:
-                            optimal_width, optimal_height = config.get_optimal_capture_size()
-                        
-                        # Actualizar variable global para preview
+                        # TEMPORAL: USAR REGIÓN DIRECTA SIN AJUSTE PARA DEBUG
+                        # Usar la región tal cual viene de la calibración
                         adjusted_winner_region = {
-                            'left': center_x - optimal_width // 2,
-                            'top': center_y - optimal_height // 2,
-                            'width': optimal_width,
-                            'height': optimal_height
+                            'left': region_numero['x'],
+                            'top': region_numero['y'],
+                            'width': region_numero['width'],
+                            'height': region_numero['height']
                         }
                         
-                        # DEBUG: Mostrar ajuste cada 100 frames para verificar
-                        if contador_scans % 100 == 0:
-                            print(f"🔍 DEBUG Region Adjustment:")
-                            print(f"   Original: ({region_numero['x']}, {region_numero['y']}) {region_numero['width']}x{region_numero['height']}")
-                            print(f"   Center: ({center_x}, {center_y})")
-                            print(f"   Adjusted: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']}) {adjusted_winner_region['width']}x{adjusted_winner_region['height']}")
-                            
-                            # EXPERIMENTO: Probar captura sin ajuste cada 1000 frames
-                            if contador_scans % 1000 == 0:
-                                print(f"🧪 EXPERIMENTO: Probando captura directa sin ajuste...")
-                                test_region = {
-                                    'left': region_numero['x'],
-                                    'top': region_numero['y'],
-                                    'width': region_numero['width'],
-                                    'height': region_numero['height']
-                                }
-                                test_screenshot = capture_screen(test_region)
-                                test_img = np.array(test_screenshot)
-                                test_numero = detect_number_from_image(test_img).strip()
-                                print(f"   Resultado sin ajuste: '{test_numero}' (size: {test_img.shape})")
+                        # Mostrar solo una vez
+                        if contador_scans == 0:
+                            print(f"🚨 USANDO REGIÓN DIRECTA SIN AJUSTE")
+                            print(f"   Región directa: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']}) {adjusted_winner_region['width']}x{adjusted_winner_region['height']}")
+                        
                         
                         screenshot = capture_screen(adjusted_winner_region)
                         img_ganador = np.array(screenshot)
@@ -597,9 +568,9 @@ def main():
                     # Convertir countdown a string para verificación
                     current_countdown_str = str(current_countdown) if current_countdown is not None else None
                     
-                    # Título indicativo de región ajustada
-                    cv2.putText(display_img, "CALIBRATOR-STYLE ADJUSTED REGION", (15, 290), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    # Título indicativo - REGIÓN DIRECTA
+                    cv2.putText(display_img, "DIRECT REGION - NO ADJUSTMENT", (15, 290), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
                     
                     # Winner detectado (grande y prominente)
                     current_winner_str = str(current_winner) if current_winner is not None else ""
@@ -690,15 +661,12 @@ def main():
                         cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 390), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
                     
-                    # Mostrar qué región está viendo el preview (AJUSTADA igual que calibrador)
+                    # Mostrar qué región está viendo el preview (DIRECTA)
                     if adjusted_winner_region:
-                        cv2.putText(display_img, f"ADJUSTED Winner: {adjusted_winner_region['width']}x{adjusted_winner_region['height']}", (220, 420), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                        cv2.putText(display_img, f"DIRECT Region: {adjusted_winner_region['width']}x{adjusted_winner_region['height']}", (220, 420), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
                         cv2.putText(display_img, f"Pos: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']})", (220, 435), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 1)
-                        # Mostrar comparación con región original
-                        cv2.putText(display_img, f"Original: {region_numero['width']}x{region_numero['height']} at ({region_numero['x']},{region_numero['y']})", (10, 450), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128, 128, 128), 1)
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
                     else:
                         cv2.putText(display_img, f"Region: Winner ({region_numero['width']}x{region_numero['height']})", (220, 420), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 200, 100), 1)
