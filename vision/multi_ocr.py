@@ -157,8 +157,8 @@ class MultiOCREngine:
     def detect_number_tesseract(self, img: np.ndarray) -> str:
         """Detección con Tesseract (método original mejorado)"""
         try:
-            from .detector import detect_number_from_image
-            return detect_number_from_image(img)
+            from .detector import _detect_number_tesseract_original
+            return _detect_number_tesseract_original(img)
         except Exception as e:
             print(f"Error en Tesseract: {e}")
         
@@ -305,8 +305,19 @@ def detect_number_debug(img: np.ndarray) -> Tuple[str, List[Tuple[str, np.ndarra
         except Exception as e:
             debug_info.append(f"{engine.upper()}: ERROR")
     
-    # Resultado final con smart method
-    final_result = multi_ocr.detect_number_smart(img)
+    # Resultado final - usar el mejor resultado obtenido
+    if debug_info:
+        # Extraer el primer resultado exitoso
+        final_result = ""
+        for info in debug_info:
+            if "': '" in info and "ERROR" not in info:
+                result_part = info.split("': '")[1].rstrip("'")
+                if result_part and result_part != "":
+                    final_result = result_part
+                    break
+    else:
+        final_result = ""
+    
     print(f"🔍 OCR Debug: {' | '.join(debug_info)} | FINAL: '{final_result}'")
     
     return final_result, debug_images
