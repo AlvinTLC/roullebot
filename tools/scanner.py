@@ -102,40 +102,55 @@ class Scanner:
                 combined_img = None
                 
                 for name, region in regions_dict.items():
-                    # Capturar región
-                    screenshot = capture_screen(region)
-                    img = np.array(screenshot)
-                    
-                    # Detectar contenido según el tipo
-                    if name == 'winner':
-                        content = detect_number_from_image(img)
-                        if content:
-                            results[name].append(content)
-                    else:
-                        # Para otras regiones, simplemente guardar si hay contenido
-                        results[name].append(img.size > 0)
-                    
-                    # Preparar imagen para preview
-                    if self.show_preview:
-                        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                        img_bgr = cv2.resize(img_bgr, (200, 100), 
-                                           interpolation=cv2.INTER_NEAREST)
+                    try:
+                        # Capturar región
+                        screenshot = capture_screen(region)
+                        img = np.array(screenshot)
                         
-                        # Añadir label
-                        cv2.putText(img_bgr, name, (5, 15),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                        
-                        if combined_img is None:
-                            combined_img = img_bgr
+                        # Detectar contenido según el tipo
+                        if name == 'winner':
+                            content = detect_number_from_image(img)
+                            if content:
+                                results[name].append(content)
                         else:
-                            combined_img = np.hstack((combined_img, img_bgr))
+                            # Para otras regiones, simplemente guardar si hay contenido
+                            results[name].append(img.size > 0)
+                        
+                        # Preparar imagen para preview
+                        if self.show_preview:
+                            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                            img_bgr = cv2.resize(img_bgr, (200, 100), 
+                                               interpolation=cv2.INTER_NEAREST)
+                            
+                            # Añadir label
+                            cv2.putText(img_bgr, name, (5, 15),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                            
+                            if combined_img is None:
+                                combined_img = img_bgr
+                            else:
+                                combined_img = np.hstack((combined_img, img_bgr))
+                    
+                    except Exception as e:
+                        print(f"❌ Error en región {name}: {e}")
+                        # Añadir región de error para preview
+                        if self.show_preview:
+                            error_img = np.zeros((100, 200, 3), dtype=np.uint8)
+                            cv2.putText(error_img, f"ERROR: {name}", (5, 50),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                            if combined_img is None:
+                                combined_img = error_img
+                            else:
+                                combined_img = np.hstack((combined_img, error_img))
                 
                 # Mostrar preview combinado
-                if self.show_preview and self.scan_count % self.preview_interval == 0:
+                if self.show_preview and self.scan_count % self.preview_interval == 0 and combined_img is not None:
                     cv2.putText(combined_img, f"Scan #{self.scan_count}", (10, 90),
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                     cv2.imshow('Multi-Scanner', combined_img)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q') or key == 27:  # q o ESC
+                        print("\n👋 Saliendo por solicitud del usuario")
                         break
                 
                 # Imprimir resultados
@@ -150,7 +165,11 @@ class Scanner:
                 time.sleep(0.1)
                 
         except KeyboardInterrupt:
-            print("\n⏹️  Escaneo detenido")
+            print("\n⏹️  Escaneo detenido por Ctrl+C")
+        except Exception as e:
+            print(f"\n❌ Error inesperado: {e}")
+            import traceback
+            traceback.print_exc()
         
         if self.show_preview:
             cv2.destroyAllWindows()

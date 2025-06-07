@@ -120,18 +120,18 @@ class Calibrator:
                 print("❌ Calibración cancelada")
                 break
             elif key == ord('s') and len(clicks) >= 3:
-                # Guardar calibración
+                # Guardar calibración con áreas más grandes
                 self.calibration_data['winner_region'] = {
-                    'x': clicks[0]['abs_x'] - 30,
-                    'y': clicks[0]['abs_y'] - 20,
-                    'width': 60,
-                    'height': 40
+                    'x': clicks[0]['abs_x'] - 50,
+                    'y': clicks[0]['abs_y'] - 35,
+                    'width': 100,
+                    'height': 70
                 }
                 self.calibration_data['countdown_region'] = {
-                    'x': clicks[1]['abs_x'] - 30,
-                    'y': clicks[1]['abs_y'] - 20,
-                    'width': 60,
-                    'height': 40
+                    'x': clicks[1]['abs_x'] - 50,
+                    'y': clicks[1]['abs_y'] - 35,
+                    'width': 100,
+                    'height': 70
                 }
                 self.calibration_data['bet_positions'] = {
                     '24': {'x': clicks[2]['abs_x'], 'y': clicks[2]['abs_y']},
@@ -222,22 +222,35 @@ class Calibrator:
         print("=" * 50)
         print("Controles:")
         print("  'q': Salir")
-        print("  '1': Región original (60x40)")
-        print("  '2': Región pequeña (40x30)")
-        print("  '3': Región extra pequeña (30x25)")
+        print("  '1': Región grande (100x70) - Para grilla de números")
+        print("  '2': Región mediana (80x60)")
+        print("  '3': Región pequeña (60x40) - Original")
+        print("  '4': Región extra pequeña (40x30)")
         print("  'd': Activar/desactivar debug OCR")
         
-        cv2.namedWindow('Test Calibración - Live Preview')
-        cv2.namedWindow('OCR Debug')
+        # Configurar ventanas específicas para macOS
+        main_window = 'Test Calibración - Live Preview'
+        debug_window = 'OCR Debug'
+        
+        cv2.namedWindow(main_window, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(debug_window, cv2.WINDOW_NORMAL)
+        
+        # En macOS, posicionar ventanas para mejor visibilidad
+        if config.system == 'darwin':
+            cv2.moveWindow(main_window, 100, 100)
+            cv2.moveWindow(debug_window, 700, 100)
+            cv2.resizeWindow(main_window, 600, 500)
         
         # Variables para ajuste dinámico
         region_sizes = [
-            {'w': 60, 'h': 40, 'name': 'Original'},
-            {'w': 40, 'h': 30, 'name': 'Pequeña'},
-            {'w': 30, 'h': 25, 'name': 'Extra Pequeña'}
+            {'w': 100, 'h': 70, 'name': 'Grande (Grilla)'},
+            {'w': 80, 'h': 60, 'name': 'Mediana'},
+            {'w': 60, 'h': 40, 'name': 'Pequeña (Original)'},
+            {'w': 40, 'h': 30, 'name': 'Extra Pequeña'}
         ]
         current_size = 0
         debug_mode = False
+        frame_count = 0
         
         from vision.detector import detect_number_from_image, detect_number_debug
         
@@ -257,6 +270,8 @@ class Calibrator:
                 'height': size['h']
             }
             
+            frame_count += 1
+            
             try:
                 # Capturar pantalla de la región ganadora
                 screenshot = capture_screen(adjusted_region)
@@ -266,13 +281,14 @@ class Calibrator:
                     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                     
                     # Detectar número
+                    numero = ""
                     if debug_mode:
                         numero, debug_images = detect_number_debug(img_bgr)
                         
-                        # Mostrar imágenes de debug
-                        if debug_images:
+                        # Mostrar imágenes de debug solo cada pocos frames para no sobrecargar
+                        if debug_images and frame_count % 3 == 0:
                             debug_combined = None
-                            for i, (name, debug_img) in enumerate(debug_images[:4]):
+                            for name, debug_img in debug_images[:4]:
                                 if len(debug_img.shape) == 2:
                                     debug_img = cv2.cvtColor(debug_img, cv2.COLOR_GRAY2BGR)
                                 debug_resized = cv2.resize(debug_img, (150, 100))
@@ -285,7 +301,7 @@ class Calibrator:
                                     debug_combined = np.hstack((debug_combined, debug_resized))
                             
                             if debug_combined is not None:
-                                cv2.imshow('OCR Debug', debug_combined)
+                                cv2.imshow(debug_window, debug_combined)
                     else:
                         numero = detect_number_from_image(img_bgr)
                     
@@ -312,16 +328,36 @@ class Calibrator:
                     cv2.putText(combined, f"Pos: x={adjusted_region['left']}, y={adjusted_region['top']}", 
                                (10, y_text + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                     
-                    cv2.putText(combined, f"Debug: {'ON' if debug_mode else 'OFF'} | 1-3: Tamaño | D: Debug | Q: Salir", 
+                    cv2.putText(combined, f"Debug: {'ON' if debug_mode else 'OFF'} | 1-4: Tamaño | D: Debug | Q: Salir", 
                                (10, y_text + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
                     
-                    cv2.imshow('Test Calibración - Live Preview', combined)
+                    cv2.imshow(main_window, combined)
+                    
+                    # Forzar actualización de ventana en macOS
+                    if config.system == 'darwin':
+                        cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 1)
+                        cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 0)
                     
             except Exception as e:
                 print(f"Error capturando región: {e}")
+                import traceback
+                traceback.print_exc()
             
-            key = cv2.waitKey(100) & 0xFF
-            if key == ord('q'):
+            # Manejo de eventos optimizado para macOS
+            wait_time = 1 if config.system == 'darwin' else 30
+            key = cv2.waitKey(wait_time) & 0xFF
+            
+            # También verificar si alguna ventana fue cerrada
+            try:
+                if cv2.getWindowProperty(main_window, cv2.WND_PROP_VISIBLE) < 1:
+                    print("❌ Ventana cerrada")
+                    break
+            except:
+                print("❌ Error verificando ventana")
+                break
+            
+            if key == ord('q') or key == 27:  # ESC también funciona
+                print("👋 Saliendo...")
                 break
             elif key == ord('1'):
                 current_size = 0
@@ -332,9 +368,14 @@ class Calibrator:
             elif key == ord('3'):
                 current_size = 2
                 print(f"✅ Cambiado a región {region_sizes[current_size]['name']}")
+            elif key == ord('4'):
+                current_size = 3
+                print(f"✅ Cambiado a región {region_sizes[current_size]['name']}")
             elif key == ord('d'):
                 debug_mode = not debug_mode
                 print(f"✅ Debug mode: {'ON' if debug_mode else 'OFF'}")
+            elif key != 255:  # Cualquier otra tecla (para debug)
+                print(f"🔍 Tecla presionada: {key} (char: {chr(key) if 32 <= key <= 126 else 'special'})")
         
         cv2.destroyAllWindows()
         
@@ -356,6 +397,57 @@ class Calibrator:
                 }
                 self.save_calibration()
                 print("✅ Nueva región guardada!")
+    
+    def _test_screen_capture(self):
+        """Prueba rápida de captura de pantalla para debugging"""
+        print("\n🧪 PRUEBA RÁPIDA DE CAPTURA")
+        print("=" * 50)
+        print("Presiona ESPACIO para capturar, Q para salir")
+        
+        try:
+            chrome_region = obtener_region_chrome()
+            print(f"✅ Chrome detectado: {chrome_region}")
+        except Exception as e:
+            print(f"❌ Error detectando Chrome: {e}")
+            return
+        
+        # Región más grande en el centro para prueba
+        test_region = {
+            'left': chrome_region['left'] + chrome_region['width'] // 2 - 50,
+            'top': chrome_region['top'] + chrome_region['height'] // 2 - 35,
+            'width': 100,
+            'height': 70
+        }
+        
+        print(f"📍 Región de prueba: {test_region}")
+        
+        cv2.namedWindow('Test Captura', cv2.WINDOW_NORMAL)
+        if config.system == 'darwin':
+            cv2.moveWindow('Test Captura', 100, 100)
+        
+        while True:
+            key = cv2.waitKey(1 if config.system == 'darwin' else 30) & 0xFF
+            
+            if key == ord(' '):
+                print("📸 Capturando...")
+                try:
+                    img = capture_screen(test_region)
+                    if img is not None and img.size > 0:
+                        # Mostrar imagen ampliada
+                        big_img = cv2.resize(img, (img.shape[1]*8, img.shape[0]*8), 
+                                           interpolation=cv2.INTER_NEAREST)
+                        cv2.imshow('Test Captura', big_img)
+                        print(f"✅ Captura exitosa: {img.shape}")
+                    else:
+                        print("❌ Captura falló - imagen vacía")
+                except Exception as e:
+                    print(f"❌ Error en captura: {e}")
+                    
+            elif key == ord('q') or key == 27:
+                break
+        
+        cv2.destroyAllWindows()
+        print("✅ Prueba de captura completada")
 
 
 def run_calibration():
@@ -369,9 +461,10 @@ def run_calibration():
         print("2. Calibrar posición de apuesta específica")
         print("3. Probar calibración actual")
         print("4. Ver calibración guardada")
-        print("5. Salir")
+        print("5. Prueba rápida de captura (debug)")
+        print("6. Salir")
         
-        choice = input("\nSelecciona una opción (1-5): ").strip()
+        choice = input("\nSelecciona una opción (1-6): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -384,6 +477,8 @@ def run_calibration():
             print("\n📋 Calibración actual:")
             print(json.dumps(calibrator.calibration_data, indent=2))
         elif choice == '5':
+            calibrator._test_screen_capture()
+        elif choice == '6':
             print("👋 Hasta luego!")
             break
         else:

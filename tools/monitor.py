@@ -132,11 +132,11 @@ class Monitor:
             print(f"❌ Error: {e}")
             return None
         
-        # Región inicial (centro de Chrome)
-        x = chrome_region['width'] // 2 - 30
-        y = chrome_region['height'] // 2 - 20
-        width = 60
-        height = 40
+        # Región inicial más grande (centro de Chrome)
+        x = chrome_region['width'] // 2 - 50
+        y = chrome_region['height'] // 2 - 35
+        width = 100
+        height = 70
         
         cv2.namedWindow('Buscador de Región')
         

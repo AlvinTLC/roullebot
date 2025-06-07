@@ -59,6 +59,8 @@ class DetectorGanadoresSimple:
         self.esperando_apuesta = False
         self.tiempo_espera_inicio = None
         self.calibration_data = calibration_data
+        self.ultimo_countdown = None
+        self.puede_apostar = True  # Nueva: controla si se puede apostar
 
     def procesar_numero(self, numero):
         """Process number and confirm winners"""
@@ -83,7 +85,10 @@ class DetectorGanadoresSimple:
                         print(f"🏆 [{timestamp}] FIRST WINNER DETECTED: {numero}")
 
                     self.ultimo_ganador = numero
-                    self.iniciar_espera_para_apuesta()
+                    self.puede_apostar = True  # Permitir apuestas después de un ganador
+                    # Para modo fallback (sin countdown)
+                    self.esperando_apuesta = True
+                    self.tiempo_espera_inicio = time.time()
                     return True
         else:
             self.numero_candidato = numero
@@ -91,30 +96,38 @@ class DetectorGanadoresSimple:
 
         return False
 
-    def iniciar_espera_para_apuesta(self):
-        """Start waiting for 3 seconds for the next bet"""
-        self.esperando_apuesta = True
-        self.tiempo_espera_inicio = time.time()
+    def procesar_countdown(self, countdown_str):
+        """Process countdown and determine when to bet"""
+        if not countdown_str or not countdown_str.isdigit():
+            return False
+        
+        countdown = int(countdown_str)
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"⏳ [{timestamp}] Waiting 3 seconds to enable bets...")
+        
+        # Solo mostrar cambios significativos del countdown
+        if self.ultimo_countdown != countdown:
+            if countdown <= 15:  # Solo mostrar cuando se acerque el momento de apostar
+                print(f"⏰ [{timestamp}] Countdown: {countdown}")
+            self.ultimo_countdown = countdown
+        
+        return countdown
 
-    def verificar_momento_apuesta(self):
-        """Check if it's time to bet (after 3 seconds)"""
-        if self.esperando_apuesta and self.tiempo_espera_inicio:
-            tiempo_transcurrido = time.time() - self.tiempo_espera_inicio
+    def verificar_momento_apuesta(self, countdown=None):
+        """Check if it's time to bet based on countdown (when countdown reaches 10)"""
+        if not self.puede_apostar:
+            return False
+            
+        if countdown is not None and countdown == 10:
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            print(f"🎯 [{timestamp}] TIME TO BET! (Countdown = 10)")
 
-            if tiempo_transcurrido >= 3.0:
-                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                print(f"🎯 [{timestamp}] TIME TO BET! (3 seconds completed)")
+            if apostar_al_numero(self.numero_objetivo, self.calibration_data):
+                self.total_apuestas += 1
+                timestamp_apuesta = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"✅ [{timestamp_apuesta}] Bet #{self.total_apuestas} confirmed on number {self.numero_objetivo}")
 
-                if apostar_al_numero(self.numero_objetivo, self.calibration_data):
-                    self.total_apuestas += 1
-                    timestamp_apuesta = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                    print(f"✅ [{timestamp_apuesta}] Bet #{self.total_apuestas} confirmed on number {self.numero_objetivo}")
-
-                    self.esperando_apuesta = False
-                    self.tiempo_espera_inicio = None
-                    return True
+                self.puede_apostar = False  # No apostar más hasta el próximo ganador
+                return True
 
         return False
 
@@ -176,14 +189,24 @@ def main():
         print(f"❌ Error detectando Chrome: {e}")
         return
     
-    # Usar región calibrada
+    # Usar regiones calibradas
     region_numero = calibrator.calibration_data['winner_region']
+    region_countdown = calibrator.calibration_data.get('countdown_region')
     
     print(f"🎯 Monitoreando número ganador en: x={region_numero['x']}, y={region_numero['y']}")
-    print(f"💰 SISTEMA SIMPLIFICADO:")
-    print(f"   1️⃣ Detectar número ganador")
-    print(f"   2️⃣ Esperar 3 segundos")
-    print(f"   3️⃣ Apostar automáticamente al 24")
+    
+    if region_countdown:
+        print(f"⏰ Monitoreando countdown en: x={region_countdown['x']}, y={region_countdown['y']}")
+        print(f"💰 SISTEMA AUTOMÁTICO:")
+        print(f"   1️⃣ Detectar número ganador")
+        print(f"   2️⃣ Monitorear countdown")
+        print(f"   3️⃣ Apostar al 24 cuando countdown = 10")
+    else:
+        print("⚠️ No hay región de countdown calibrada. Usando modo de espera de 3 segundos.")
+        print(f"💰 SISTEMA SIMPLIFICADO:")
+        print(f"   1️⃣ Detectar número ganador")
+        print(f"   2️⃣ Esperar 3 segundos") 
+        print(f"   3️⃣ Apostar automáticamente al 24")
     print(f"🚀 VELOCIDAD MÁXIMA: ~50 FPS de detección")
     print(f"⏱️  Sesión iniciada: {datetime.now().strftime('%H:%M:%S')}")
     print(f"💡 Ctrl+C para terminar y ver resumen")
@@ -197,22 +220,46 @@ def main():
 
     try:
         while True:
-            # Capturar región usando el nuevo sistema
-            screenshot = capture_screen({
-                'left': region_numero['x'],
-                'top': region_numero['y'],
-                'width': region_numero['width'],
-                'height': region_numero['height']
-            })
+            # Capturar región del número ganador
+            screenshot = capture_screen(region_numero)
             img_ganador = np.array(screenshot)
             contador_scans += 1
+            
+            numero_ganador = ""
+            countdown_actual = None
 
             if img_ganador is not None and img_ganador.size > 0:
                 numero_ganador = detect_number_from_image(img_ganador).strip()
                 if numero_ganador:
                     detector.procesar_numero(numero_ganador)
 
-                detector.verificar_momento_apuesta()
+            # Capturar countdown si está disponible
+            if region_countdown:
+                try:
+                    screenshot_countdown = capture_screen(region_countdown)
+                    img_countdown = np.array(screenshot_countdown)
+                    if img_countdown is not None and img_countdown.size > 0:
+                        countdown_str = detect_number_from_image(img_countdown).strip()
+                        if countdown_str:
+                            countdown_actual = detector.procesar_countdown(countdown_str)
+                except Exception as e:
+                    if contador_scans % 1000 == 0:  # Solo mostrar error ocasionalmente
+                        print(f"⚠️ Error capturando countdown: {e}")
+
+            # Verificar momento de apuesta (con o sin countdown)
+            if region_countdown and countdown_actual is not None:
+                detector.verificar_momento_apuesta(countdown_actual)
+            else:
+                # Modo fallback: esperar 3 segundos después de ganador (código anterior)
+                if detector.esperando_apuesta and detector.tiempo_espera_inicio:
+                    tiempo_transcurrido = time.time() - detector.tiempo_espera_inicio
+                    if tiempo_transcurrido >= 3.0:
+                        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                        print(f"🎯 [{timestamp}] TIME TO BET! (3 seconds completed)")
+                        if apostar_al_numero(detector.numero_objetivo, detector.calibration_data):
+                            detector.total_apuestas += 1
+                            detector.esperando_apuesta = False
+                            detector.tiempo_espera_inicio = None
 
             if contador_scans % 250 == 0:
                 if img_ganador is not None:
@@ -222,18 +269,31 @@ def main():
                     info_img = cv2.copyMakeBorder(preview, 0, 120, 0, 0, cv2.BORDER_CONSTANT, value=(50, 50, 50))
 
                     cv2.putText(info_img, f"Winner: {numero_ganador}", (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    cv2.putText(info_img, f"Bets: {detector.total_apuestas}", (10, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    cv2.putText(info_img, f"Target: {detector.numero_objetivo}", (150, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    cv2.putText(info_img, f"Winners: {len(detector.historial_ganadores)}", (10, 375), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    cv2.putText(info_img, f"Countdown: {countdown_actual if countdown_actual else 'N/A'}", (10, 345), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+                    cv2.putText(info_img, f"Bets: {detector.total_apuestas}", (10, 370), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    cv2.putText(info_img, f"Target: {detector.numero_objetivo}", (150, 370), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    cv2.putText(info_img, f"Winners: {len(detector.historial_ganadores)}", (10, 395), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                    if detector.esperando_apuesta:
-                        tiempo_restante = 3.0 - (time.time() - detector.tiempo_espera_inicio)
-                        if tiempo_restante > 0:
-                            cv2.putText(info_img, f"Waiting: {tiempo_restante:.1f}s", (10, 400), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                    # Mostrar estado actual
+                    if region_countdown:
+                        if detector.puede_apostar:
+                            if countdown_actual and countdown_actual <= 15:
+                                color = (0, 255, 255) if countdown_actual > 10 else (0, 255, 0)
+                                cv2.putText(info_img, f"Ready to bet at countdown 10", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                            else:
+                                cv2.putText(info_img, "Waiting for countdown...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
                         else:
-                            cv2.putText(info_img, "BETTING...", (10, 400), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                            cv2.putText(info_img, "Bet placed, waiting for next winner", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
                     else:
-                        cv2.putText(info_img, "Waiting for winner...", (10, 400), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+                        # Modo fallback (3 segundos)
+                        if detector.esperando_apuesta and detector.tiempo_espera_inicio:
+                            tiempo_restante = 3.0 - (time.time() - detector.tiempo_espera_inicio)
+                            if tiempo_restante > 0:
+                                cv2.putText(info_img, f"Waiting: {tiempo_restante:.1f}s", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                            else:
+                                cv2.putText(info_img, "BETTING...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        else:
+                            cv2.putText(info_img, "Waiting for winner...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
                     if contador_scans > 100:
                         duracion_actual = time.time() - detector.inicio_sesion
@@ -245,7 +305,9 @@ def main():
             if contador_scans % 2500 == 0:
                 duracion = time.time() - detector.inicio_sesion
                 fps = contador_scans / duracion
-                print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] Scans: {contador_scans} | FPS: {fps:.1f} | Bets: {detector.total_apuestas} | Winners: {len(detector.historial_ganadores)}")
+                countdown_status = f"Countdown: {countdown_actual}" if countdown_actual else "No countdown"
+                bet_status = "Can bet" if detector.puede_apostar else "Bet placed"
+                print(f"📊 [{datetime.now().strftime('%H:%M:%S')}] Scans: {contador_scans} | FPS: {fps:.1f} | Bets: {detector.total_apuestas} | Winners: {len(detector.historial_ganadores)} | {countdown_status} | {bet_status}")
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
