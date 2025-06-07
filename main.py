@@ -155,38 +155,51 @@ class DetectorGanadoresSimple:
         return countdown
 
     def verificar_momento_apuesta(self, countdown=None):
-        """Check if it's time to bet - AGGRESSIVE BETTING MODE"""
+        """Check if it's time to bet - IMPROVED CONSISTENCY"""
         if not self.puede_apostar:
             return False
         
-        # Verificar que no hayamos apostado muy recientemente (evitar spam)
         tiempo_actual = time.time()
-        if tiempo_actual - self.tiempo_ultima_apuesta < 1.0:  # 1 segundo mínimo entre apuestas
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        
+        # Verificar que no hayamos apostado muy recientemente
+        if tiempo_actual - self.tiempo_ultima_apuesta < 0.8:  # Reducido a 0.8s
             return False
             
         apuesta_realizada = False
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         
-        # MODO AGRESIVO: Apostar en múltiples momentos
-        if countdown is not None:
-            # Apostar cuando countdown = 10, 8, 6, 4 (múltiples oportunidades)
-            if countdown in [10, 8, 6, 4]:
-                print(f"🎯 [{timestamp}] TIME TO BET! (Countdown = {countdown})")
+        # MODO MEJORADO: Priorizar countdown, luego fallback
+        if countdown is not None and countdown > 0:
+            # Apostar en countdown específicos con mayor agresividad
+            if countdown in [12, 10, 8, 6]:  # Más oportunidades + temprano
+                print(f"🎯 [{timestamp}] BETTING NOW! (Countdown = {countdown})")
                 apuesta_realizada = True
-        else:
-            # Modo fallback: apostar después de 3 segundos
-            if self.esperando_apuesta and self.tiempo_espera_inicio:
-                tiempo_transcurrido = tiempo_actual - self.tiempo_espera_inicio
-                if tiempo_transcurrido >= 3.0:
-                    print(f"🎯 [{timestamp}] TIME TO BET! (3 seconds completed)")
-                    apuesta_realizada = True
+                # Marcar inmediatamente para evitar apuestas múltiples
+                self.puede_apostar = False
+                
+        elif self.esperando_apuesta and self.tiempo_espera_inicio:
+            # Modo fallback más agresivo
+            tiempo_transcurrido = tiempo_actual - self.tiempo_espera_inicio
+            if tiempo_transcurrido >= 2.5:  # Reducido a 2.5 segundos
+                print(f"🎯 [{timestamp}] BETTING NOW! (2.5s fallback)")
+                apuesta_realizada = True
+                self.puede_apostar = False
 
         if apuesta_realizada:
-            if apostar_al_numero(self.numero_objetivo, self.calibration_data):
+            # Intentar apuesta con retry
+            success = False
+            for intento in range(2):  # Hasta 2 intentos
+                if apostar_al_numero(self.numero_objetivo, self.calibration_data):
+                    success = True
+                    break
+                else:
+                    time.sleep(0.1)  # Pequeña pausa entre intentos
+                    
+            if success:
                 self.total_apuestas += 1
                 self.tiempo_ultima_apuesta = tiempo_actual
                 timestamp_apuesta = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                print(f"✅ [{timestamp_apuesta}] Bet #{self.total_apuestas} confirmed on number {self.numero_objetivo}")
+                print(f"✅ [{timestamp_apuesta}] BET #{self.total_apuestas} CONFIRMED → {self.numero_objetivo}")
                 print(f"🎲 Next target will be: RANDOM (after next winner)")
 
                 # En modo agresivo, seguir apostando hasta que termine la ronda
@@ -386,48 +399,96 @@ def main():
             
             contador_scans += 1
 
-            # Preview optimizado basado en tiempo real
+            # Preview mejorado centrado en región ganadora
             if (current_time - last_preview_time) >= preview_interval and 'img_ganador' in locals():
                 if img_ganador is not None:
                     # Convertir a BGR para cv2
                     img_bgr = cv2.cvtColor(img_ganador, cv2.COLOR_RGB2BGR)
-                    preview = cv2.resize(img_bgr, (300, 300), interpolation=cv2.INTER_NEAREST)
-                    info_img = cv2.copyMakeBorder(preview, 0, 140, 0, 0, cv2.BORDER_CONSTANT, value=(50, 50, 50))
+                    
+                    # Preview más grande y centrado
+                    preview = cv2.resize(img_bgr, (400, 280), interpolation=cv2.INTER_NEAREST)
+                    
+                    # Panel de información organizado
+                    info_panel = np.zeros((180, 400, 3), dtype=np.uint8)
+                    info_panel[:] = (40, 40, 40)  # Fondo gris oscuro
+                    
+                    # Combinar preview + info panel
+                    display_img = np.vstack([preview, info_panel])
+                    
+                    # Dibujar línea separadora
+                    cv2.line(display_img, (0, 280), (400, 280), (100, 100, 100), 2)
+                    
+                    # Información principal (lado izquierdo)
+                    current_winner = numero_ganador if 'numero_ganador' in locals() and numero_ganador else detector.ultimo_numero_detectado
+                    current_countdown = countdown_actual if 'countdown_actual' in locals() and countdown_actual else detector.ultimo_countdown
+                    
+                    # Winner detectado (grande y prominente)
+                    winner_color = (0, 255, 0) if current_winner and current_winner.isdigit() else (0, 0, 255)
+                    cv2.putText(display_img, f"WINNER: {current_winner or 'N/A'}", (15, 310), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.9, winner_color, 2)
+                    
+                    # Countdown (prominente)
+                    countdown_color = (0, 255, 255) if current_countdown and int(current_countdown) <= 15 else (255, 255, 0)
+                    cv2.putText(display_img, f"COUNTDOWN: {current_countdown or 'N/A'}", (15, 340), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, countdown_color, 2)
+                    
+                    # Target actual
+                    target_color = (255, 0, 255) if detector.modo_aleatorio else (255, 255, 255)
+                    mode_text = "RANDOM" if detector.modo_aleatorio else "FIXED"
+                    cv2.putText(display_img, f"TARGET: {detector.numero_objetivo} ({mode_text})", (15, 370), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, target_color, 1)
+                    
+                    # Estadísticas (lado derecho)
+                    cv2.putText(display_img, f"Bets: {detector.total_apuestas}", (220, 310), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(display_img, f"Winners: {len(detector.historial_ganadores)}", (220, 330), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(display_img, f"Detections: {detector.contador_detecciones_validas}", (220, 350), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
-                    cv2.putText(info_img, f"Winner: {numero_ganador if 'numero_ganador' in locals() else detector.ultimo_numero_detectado}", (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                    cv2.putText(info_img, f"Countdown: {countdown_actual if 'countdown_actual' in locals() and countdown_actual else detector.ultimo_countdown}", (10, 345), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-                    cv2.putText(info_img, f"Bets: {detector.total_apuestas}", (10, 370), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    cv2.putText(info_img, f"Target: {detector.numero_objetivo} {'(RANDOM)' if detector.modo_aleatorio else '(FIXED)'}", (10, 395), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    cv2.putText(info_img, f"Winners: {len(detector.historial_ganadores)}", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    cv2.putText(info_img, f"Valid detections: {detector.contador_detecciones_validas}", (10, 445), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-
-                    # Mostrar estado actual
+                    # Estado de apuestas (centro inferior)
                     if region_countdown:
                         if detector.puede_apostar:
-                            if countdown_actual and countdown_actual <= 15:
-                                color = (0, 255, 255) if countdown_actual > 10 else (0, 255, 0)
-                                cv2.putText(info_img, f"Ready to bet at countdown 10", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                            if current_countdown and int(current_countdown) <= 15:
+                                color = (0, 255, 255) if int(current_countdown) > 10 else (0, 255, 0)
+                                status_text = f"READY TO BET (countdown: {current_countdown})"
                             else:
-                                cv2.putText(info_img, "Waiting for countdown...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                                color = (200, 200, 200)
+                                status_text = "Waiting for countdown..."
                         else:
-                            cv2.putText(info_img, "Bet placed, waiting for next winner", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 255), 1)
+                            color = (100, 100, 255)
+                            status_text = "Bet placed, waiting for next winner"
                     else:
                         # Modo fallback (3 segundos)
                         if detector.esperando_apuesta and detector.tiempo_espera_inicio:
                             tiempo_restante = 3.0 - (time.time() - detector.tiempo_espera_inicio)
                             if tiempo_restante > 0:
-                                cv2.putText(info_img, f"Waiting: {tiempo_restante:.1f}s", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                                color = (255, 255, 0)
+                                status_text = f"Waiting: {tiempo_restante:.1f}s"
                             else:
-                                cv2.putText(info_img, "BETTING...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                                color = (0, 255, 0)
+                                status_text = "BETTING NOW!"
                         else:
-                            cv2.putText(info_img, "Waiting for winner...", (10, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+                            color = (200, 200, 200)
+                            status_text = "Waiting for winner..."
+                    
+                    cv2.putText(display_img, status_text, (15, 400), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
+                    # FPS en esquina inferior derecha
                     if contador_scans > 100:
                         duracion_actual = time.time() - detector.inicio_sesion
                         fps_actual = contador_scans / duracion_actual
-                        cv2.putText(info_img, f"FPS: {fps_actual:.1f}", (200, 375), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        cv2.putText(display_img, f"FPS: {fps_actual:.1f}", (320, 370), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    
+                    # Último ganador si existe
+                    if len(detector.historial_ganadores) > 0:
+                        ultimo_ganador = detector.historial_ganadores[-1][1]
+                        cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 370), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
-                    cv2.imshow("Simplified Bettor on 24", info_img)
+                    cv2.imshow("RouletteBot - Live Preview", display_img)
                     last_preview_time = current_time
 
             if contador_scans % 2500 == 0:

@@ -40,15 +40,17 @@ class Calibrator:
             except:
                 pass
         
-        # Usar tamaño óptimo según resolución
+        # Usar tamaños óptimos según resolución
         optimal_width, optimal_height = config.get_optimal_capture_size()
+        countdown_width, countdown_height = config.get_optimal_countdown_size()
         
         return {
             'winner_region': None,
             'countdown_region': None,
             'bet_positions': {},
             'chrome_offset': {'x': 0, 'y': 0},
-            'optimal_capture_size': {'width': optimal_width, 'height': optimal_height}
+            'optimal_capture_size': {'width': optimal_width, 'height': optimal_height},
+            'optimal_countdown_size': {'width': countdown_width, 'height': countdown_height}
         }
     
     def save_calibration(self):
@@ -119,11 +121,46 @@ class Calibrator:
                 cv2.putText(img, tasks[current_task], (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
-            # Mostrar clicks anteriores
+            # Dibujar grilla de ayuda
+            grid_size = 50
+            height, width = img.shape[:2]
+            
+            # Líneas verticales
+            for x in range(0, width, grid_size):
+                cv2.line(img, (x, 0), (x, height), (128, 128, 128), 1)
+            
+            # Líneas horizontales
+            for y in range(0, height, grid_size):
+                cv2.line(img, (0, y), (width, y), (128, 128, 128), 1)
+            
+            # Mostrar clicks anteriores con cuadrados de selección
             for i, click in enumerate(clicks):
-                cv2.circle(img, (click['x'], click['y']), 5, (0, 0, 255), -1)
-                cv2.putText(img, f"{i+1}", (click['x']+10, click['y']-10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                color = (0, 255, 0) if i < 2 else (255, 0, 0)  # Verde para regiones, rojo para apuestas
+                
+                # Determinar tamaño del cuadrado según el tipo
+                if i == 0:  # Winner region
+                    optimal_width, optimal_height = config.get_optimal_capture_size()
+                    rect_w, rect_h = optimal_width//2, optimal_height//2
+                elif i == 1:  # Countdown region
+                    countdown_width, countdown_height = config.get_optimal_countdown_size()
+                    rect_w, rect_h = countdown_width//2, countdown_height//2
+                else:  # Bet positions
+                    rect_w, rect_h = 15, 15
+                
+                # Dibujar cuadrado de selección
+                cv2.rectangle(img, 
+                            (click['x'] - rect_w, click['y'] - rect_h),
+                            (click['x'] + rect_w, click['y'] + rect_h),
+                            color, 2)
+                
+                # Círculo central
+                cv2.circle(img, (click['x'], click['y']), 3, color, -1)
+                
+                # Etiqueta
+                labels = ["WINNER", "COUNTDOWN", "BET 24", "BET 0", "BET 12"]
+                label = labels[i] if i < len(labels) else f"BET {i-2}"
+                cv2.putText(img, label, (click['x']+rect_w+5, click['y']-5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
             
             cv2.imshow('Calibración Visual', img)
             
@@ -132,8 +169,9 @@ class Calibrator:
                 print("❌ Calibración cancelada")
                 break
             elif key == ord('s') and len(clicks) >= 3:
-                # Usar tamaño óptimo según resolución
+                # Usar tamaños óptimos según resolución
                 optimal_width, optimal_height = config.get_optimal_capture_size()
+                countdown_width, countdown_height = config.get_optimal_countdown_size()
                 
                 # Guardar calibración con áreas auto-escaladas
                 self.calibration_data['winner_region'] = {
@@ -143,10 +181,10 @@ class Calibrator:
                     'height': optimal_height
                 }
                 self.calibration_data['countdown_region'] = {
-                    'x': clicks[1]['abs_x'] - optimal_width//2,
-                    'y': clicks[1]['abs_y'] - optimal_height//2,
-                    'width': optimal_width,
-                    'height': optimal_height
+                    'x': clicks[1]['abs_x'] - countdown_width//2,
+                    'y': clicks[1]['abs_y'] - countdown_height//2,
+                    'width': countdown_width,
+                    'height': countdown_height
                 }
                 self.calibration_data['bet_positions'] = {
                     '24': {'x': clicks[2]['abs_x'], 'y': clicks[2]['abs_y']},
