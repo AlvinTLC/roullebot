@@ -5,6 +5,11 @@ mss~=10.0.0
 pytesseract~=0.3.13
 PyAutoGUI~=0.9.54
 
+# Advanced OCR engines (optional but recommended)
+easyocr~=1.7.0
+paddlepaddle
+paddleocr
+
 # Windows specific
 PyGetWindow~=0.0.9; sys_platform == 'win32'
 psutil~=6.1.0; sys_platform == 'win32'

@@ -24,12 +24,47 @@ class WindowManager:
         return None
     
     def _find_chrome_windows_win(self) -> Optional[dict]:
-        """Encuentra ventana de Chrome en Windows"""
+        """Encuentra ventana de Chrome/navegador en Windows"""
         try:
             import pygetwindow as gw
-            windows = gw.getWindowsWithTitle('Chrome')
-            if windows:
-                win = windows[0]
+            
+            # Lista de patrones de títulos a buscar (en orden de prioridad)
+            search_patterns = [
+                'Stake',               # Stake.com - cualquier variación
+                'stake.com',           # stake.com específicamente
+                'Chrome',              # Chrome genérico
+                'Google Chrome',       # Chrome completo
+                'Microsoft Edge',      # Edge
+                'Edge',                # Edge corto
+                'Firefox',             # Firefox
+                'Mozilla Firefox',     # Firefox completo
+                'Brave',               # Brave Browser
+                'Opera'                # Opera
+            ]
+            
+            found_windows = []
+            
+            # Buscar ventanas por cada patrón
+            for pattern in search_patterns:
+                try:
+                    # Buscar ventanas que contengan el patrón (case insensitive)
+                    all_windows = gw.getAllWindows()
+                    for win in all_windows:
+                        if (win.title and 
+                            pattern.lower() in win.title.lower() and 
+                            win.width > 300 and win.height > 200 and  # Filtrar ventanas muy pequeñas
+                            win.visible):
+                            found_windows.append((pattern, win))
+                            print(f"🔍 Ventana encontrada: '{win.title}' (patrón: {pattern})")
+                except:
+                    continue
+            
+            if found_windows:
+                # Priorizar según el orden de los patrones
+                found_windows.sort(key=lambda x: search_patterns.index(x[0]))
+                pattern, win = found_windows[0]
+                
+                print(f"✅ Usando ventana: '{win.title}' (patrón: {pattern})")
                 return {
                     'title': win.title,
                     'x': win.left,
@@ -37,10 +72,16 @@ class WindowManager:
                     'width': win.width,
                     'height': win.height
                 }
+            else:
+                print("❌ No se encontró ninguna ventana de navegador compatible")
+                print("💡 Asegúrate de que tienes abierto:")
+                print("   - Stake.com en cualquier navegador")
+                print("   - O Chrome/Edge/Firefox con cualquier página")
+                
         except ImportError:
-            print("pygetwindow no está instalado. Instala con: pip install pygetwindow")
+            print("❌ pygetwindow no está instalado. Instala con: pip install pygetwindow")
         except Exception as e:
-            print(f"Error encontrando ventana Chrome en Windows: {e}")
+            print(f"❌ Error encontrando ventana de navegador en Windows: {e}")
         return None
     
     def _find_chrome_window_mac(self) -> Optional[dict]:
@@ -193,12 +234,14 @@ class WindowManager:
         try:
             if self.is_windows:
                 import pygetwindow as gw
-                windows = gw.getWindowsWithTitle(window_info.get('title', ''))
+                # Buscar por título exacto
+                windows = [w for w in gw.getAllWindows() if w.title == window_info.get('title', '')]
                 if windows:
                     windows[0].activate()
                     return True
                     
             elif self.is_mac:
+                # Script genérico que activa la ventana frontal del navegador
                 script = '''
                 tell application "Google Chrome"
                     activate
@@ -237,38 +280,55 @@ class WindowManager:
         return None
     
     def _normalize_chrome_windows(self, width, height, x, y) -> dict:
-        """Normaliza Chrome en Windows"""
+        """Normaliza navegador en Windows"""
         try:
             import pygetwindow as gw
-            windows = gw.getWindowsWithTitle('Chrome')
-            if windows:
-                win = windows[0]
+            
+            # Intentar encontrar la ventana usando la misma lógica que find_chrome_window
+            window_info = self._find_chrome_windows_win()
+            if not window_info:
+                print("❌ No se encontró ventana de navegador para normalizar")
+                return None
+            
+            # Buscar la ventana por título exacto
+            windows = [w for w in gw.getAllWindows() if w.title == window_info['title']]
+            if not windows:
+                print(f"❌ No se pudo encontrar ventana '{window_info['title']}'")
+                return None
                 
-                # Activar y redimensionar
-                win.activate()
-                time.sleep(0.5)
-                
-                # Restaurar si está maximizada
-                if win.isMaximized:
-                    win.restore()
-                    time.sleep(0.3)
-                
-                # Redimensionar y mover
-                win.resizeTo(width, height)
-                time.sleep(0.2)
-                win.moveTo(x, y)
+            win = windows[0]
+            print(f"🔧 Normalizando '{win.title}'...")
+            
+            # Activar y redimensionar
+            win.activate()
+            time.sleep(0.5)
+            
+            # Restaurar si está maximizada
+            if win.isMaximized:
+                print("   Restaurando desde maximizado...")
+                win.restore()
                 time.sleep(0.3)
-                
-                print(f"✅ Chrome normalizado en Windows")
-                return {
-                    'title': win.title,
-                    'x': win.left,
-                    'y': win.top,
-                    'width': win.width,
-                    'height': win.height
-                }
+            
+            # Redimensionar y mover
+            print(f"   Redimensionando a {width}x{height}...")
+            win.resizeTo(width, height)
+            time.sleep(0.2)
+            print(f"   Moviendo a ({x}, {y})...")
+            win.moveTo(x, y)
+            time.sleep(0.3)
+            
+            print(f"✅ Navegador normalizado en Windows")
+            return {
+                'title': win.title,
+                'x': win.left,
+                'y': win.top,
+                'width': win.width,
+                'height': win.height
+            }
         except Exception as e:
-            print(f"❌ Error normalizando Chrome en Windows: {e}")
+            print(f"❌ Error normalizando navegador en Windows: {e}")
+            import traceback
+            traceback.print_exc()
         return None
     
     def _normalize_chrome_mac(self, width, height, x, y) -> dict:

@@ -61,7 +61,25 @@ def preprocess_image(img, method='adaptive'):
 
 
 def detect_number_from_image(img):
-    """Detecta número de la imagen con múltiples métodos optimizados"""
+    """Detecta número usando el sistema multi-OCR con fallback automático"""
+    try:
+        # Intentar usar el nuevo sistema multi-OCR
+        from .multi_ocr import detect_number_from_image as multi_detect
+        result = multi_detect(img, method='smart')
+        if result:
+            return result
+    except ImportError:
+        # Fallback al método original si multi_ocr no está disponible
+        pass
+    except Exception as e:
+        print(f"⚠️ Error en multi-OCR, usando Tesseract: {e}")
+    
+    # Método original con Tesseract (fallback)
+    return _detect_number_tesseract_original(img)
+
+
+def _detect_number_tesseract_original(img):
+    """Método original de Tesseract (mantenido como fallback)"""
     if img is None or img.size == 0:
         return ""
 
@@ -135,6 +153,17 @@ def detect_number_from_image(img):
 
 def detect_number_debug(img):
     """Versión de debug que muestra los pasos de procesamiento"""
+    try:
+        # Intentar usar el nuevo sistema multi-OCR debug
+        from .multi_ocr import detect_number_debug as multi_debug
+        return multi_debug(img)
+    except ImportError:
+        # Fallback al método original si multi_ocr no está disponible
+        pass
+    except Exception as e:
+        print(f"⚠️ Error en multi-OCR debug, usando método original: {e}")
+    
+    # Método debug original
     if img is None or img.size == 0:
         return "", []
 

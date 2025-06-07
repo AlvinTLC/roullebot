@@ -5,19 +5,23 @@ Bot automatizado para apostar en ruleta online, compatible con Windows, macOS y 
 ## 🚀 Características
 
 - ✅ **Multiplataforma**: Funciona en Windows, macOS y Linux
-- 🎯 **Detección OCR**: Detecta automáticamente números ganadores usando Tesseract
+- 🎯 **Multi-OCR Inteligente**: EasyOCR, PaddleOCR y Tesseract con fallback automático
 - 🎮 **Apuestas Automáticas**: Realiza apuestas automáticas después de detectar ganadores
 - 📊 **Estadísticas**: Rastrea ganancias, pérdidas y tasa de éxito
 - 🔧 **Calibración Visual**: Sistema de calibración intuitivo por clicks
 - 🎯 **Precisión Exacta**: Mode run usa el mismo approach de ajuste de regiones que el calibrador
 - 🚀 **Alto Rendimiento**: ~50 FPS de detección
+- 🧠 **OCR Adaptativo**: Cambia automáticamente entre motores según disponibilidad
 
 ## 📋 Requisitos Previos
 
 ### Todas las Plataformas
 - Python 3.8 o superior
-- Google Chrome
-- Tesseract OCR
+- Cualquier navegador (Chrome, Edge, Firefox, Brave, Opera)
+- Al menos uno de estos motores OCR:
+  - **EasyOCR** (Recomendado para gaming) - `pip install easyocr`
+  - **PaddleOCR** (Más rápido) - `pip install paddlepaddle paddleocr`
+  - **Tesseract** (Fallback clásico) - Ver instalación por SO abajo
 
 ### Windows
 ```bash
@@ -44,6 +48,54 @@ sudo apt-get install xdotool  # Para manejo de ventanas
 sudo dnf install tesseract
 sudo dnf install xdotool
 ```
+
+## 🎯 Sistema Multi-OCR
+
+RouletteBot incluye un sistema inteligente de OCR que automáticamente usa el mejor motor disponible:
+
+### Motores Soportados (por orden de preferencia)
+
+1. **EasyOCR** 🥇 (Mejor para gaming)
+   - Excelente para números pequeños en juegos
+   - Funciona sin GPU 
+   - Muy preciso con texto superpuesto
+   ```bash
+   pip install easyocr
+   ```
+
+2. **PaddleOCR** 🥈 (Más rápido)
+   - Velocidad superior
+   - Buena precisión general
+   - Optimizado para texto asiático y occidental
+   ```bash
+   pip install paddlepaddle paddleocr
+   ```
+
+3. **Tesseract** 🥉 (Fallback clásico)
+   - Motor tradicional de OCR
+   - Requiere instalación del sistema
+   - Fallback automático si otros fallan
+
+### Instalación Recomendada 💡
+
+**Para máxima precisión (recomendado):**
+```bash
+pip install easyocr paddlepaddle paddleocr
+```
+
+**Instalación mínima:**
+```bash
+pip install easyocr
+```
+
+El bot **automáticamente detecta** qué motores están disponibles y usa el mejor.
+
+### Probar Motores OCR 🧪
+
+```bash
+python test_multi_ocr.py
+```
+Este script compara la precisión y velocidad de todos los motores instalados.
 
 ## 🔧 Instalación
 
@@ -206,15 +258,49 @@ Para garantizar que las coordenadas calibradas funcionen correctamente, Roulette
 - Verifica que Tesseract esté en el PATH del sistema
 - En Windows, puede necesitar reiniciar después de instalar
 
-### No detecta la ventana de Chrome
-- Asegúrate de que Chrome esté abierto y visible
+### No detecta la ventana del navegador
+- **Windows**: Detecta automáticamente Chrome, Edge, Firefox, Brave, Opera y especialmente Stake.com
+- **Asegúrate que el navegador esté abierto y visible (no minimizado)**
+- **Para Stake.com**: El bot prioriza ventanas que contengan "Stake" en el título
 - En Linux, instala `xdotool` si no está instalado
 - En macOS, puede necesitar permisos de accesibilidad
 
+### Problema específico con Stake.com en Windows
+Si el bot no detecta Stake.com:
+1. **Abre Stake.com en cualquier navegador** (Chrome, Edge, Firefox, etc.)
+2. **Asegúrate que "Stake" aparezca en el título de la pestaña**
+3. **Ejecuta la opción 9** del calibrador para diagnóstico detallado
+4. **El bot listará todas las ventanas** disponibles para debug
+
 ### No detecta números correctamente
+
+#### Sistema Multi-OCR 🧠
+1. **Verifica motores instalados**:
+   ```bash
+   python test_multi_ocr.py
+   ```
+
+2. **Instala motores adicionales** para mejor precisión:
+   ```bash
+   # Mejor para gaming
+   pip install easyocr
+   
+   # Más rápido
+   pip install paddlepaddle paddleocr
+   ```
+
+3. **El bot automáticamente cambia** entre motores según disponibilidad
+
+#### Calibración 🔧
 - Ejecuta la calibración nuevamente
-- Ajusta el zoom de Chrome al 100%
+- Ajusta el zoom del navegador al 100%
 - Asegúrate de que la región capturada sea clara
+- Usa el diagnóstico (opción 9) para verificar la captura
+
+#### Específico para Stake.com 🎰
+- Asegúrate que "Stake" aparezca en el título de la ventana
+- Usa navegadores compatibles (Chrome, Edge, Firefox, etc.)
+- La ventana debe estar visible y no minimizada
 
 ## ⚠️ Advertencia Legal
 

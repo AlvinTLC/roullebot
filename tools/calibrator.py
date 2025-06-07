@@ -1615,19 +1615,57 @@ class Calibrator:
     
     def diagnose_chrome_position(self):
         """Diagnóstica problemas con la posición de Chrome"""
-        print("\n🔍 DIAGNÓSTICO DE POSICIÓN DE CHROME")
-        print("=" * 50)
+        print("\n🔍 DIAGNÓSTICO DE POSICIÓN DE CHROME/NAVEGADOR")
+        print("=" * 60)
         
         try:
-            # Obtener información actual de Chrome
             from utils.window_manager import window_manager
+            
+            # En Windows, mostrar todas las ventanas disponibles para debug
+            if config.is_windows:
+                print("\n🪟 LISTANDO TODAS LAS VENTANAS DISPONIBLES (Windows):")
+                try:
+                    import pygetwindow as gw
+                    all_windows = gw.getAllWindows()
+                    print(f"   Total ventanas encontradas: {len(all_windows)}")
+                    
+                    # Filtrar y mostrar ventanas relevantes
+                    relevant_windows = []
+                    for i, win in enumerate(all_windows):
+                        if (win.title and 
+                            win.width > 300 and win.height > 200 and 
+                            win.visible and
+                            any(keyword in win.title.lower() for keyword in ['stake', 'chrome', 'edge', 'firefox', 'brave', 'opera'])):
+                            relevant_windows.append(win)
+                            print(f"   {len(relevant_windows)}. '{win.title}'")
+                            print(f"      Posición: ({win.left}, {win.top}), Tamaño: {win.width}x{win.height}")
+                    
+                    if not relevant_windows:
+                        print("   ❌ No se encontraron ventanas de navegador relevantes")
+                        print("   💡 Ventanas que podrían contener stake/navegador:")
+                        for win in all_windows[:10]:  # Mostrar primeras 10
+                            if win.title and win.width > 300 and win.height > 200:
+                                print(f"      - '{win.title}' ({win.width}x{win.height})")
+                    else:
+                        print(f"   ✅ Encontradas {len(relevant_windows)} ventanas de navegador")
+                        
+                except Exception as e:
+                    print(f"   ❌ Error listando ventanas: {e}")
+            
+            # Intentar encontrar Chrome/navegador
             chrome_window = window_manager.find_chrome_window()
             
             if not chrome_window:
-                print("❌ No se encuentra ventana de Chrome abierta")
+                print("\n❌ NO SE ENCUENTRA VENTANA DE NAVEGADOR")
+                print("\n🔧 SOLUCIONES:")
+                print("   1. Abre Stake.com en cualquier navegador (Chrome, Edge, Firefox, etc.)")
+                print("   2. Asegúrate que la ventana del navegador esté visible (no minimizada)")
+                print("   3. El título de la ventana debe contener 'Stake.com' o el nombre del navegador")
+                print("   4. Intenta cambiar a una pestaña que tenga 'Stake' en el título")
                 return
                 
-            print(f"📊 CHROME ACTUAL:")
+            print(f"\n✅ NAVEGADOR ENCONTRADO:")
+            print(f"   Título: '{chrome_window['title']}'")
             print(f"   Posición: ({chrome_window['x']}, {chrome_window['y']})")
             print(f"   Tamaño: {chrome_window['width']}x{chrome_window['height']}")
             
@@ -1646,13 +1684,13 @@ class Calibrator:
             # Detectar problemas comunes
             problemas = []
             if chrome_region_norm['left'] < 0:
-                problemas.append("Chrome está fuera del borde izquierdo de pantalla")
+                problemas.append("Navegador está fuera del borde izquierdo de pantalla")
             if chrome_region_norm['top'] < 0:
-                problemas.append("Chrome está fuera del borde superior de pantalla")
+                problemas.append("Navegador está fuera del borde superior de pantalla")
             if chrome_region_norm['left'] + chrome_region_norm['width'] > 3000:
-                problemas.append("Chrome se extiende más allá del ancho esperado")
+                problemas.append("Navegador se extiende más allá del ancho esperado")
             if chrome_region_norm['top'] + chrome_region_norm['height'] > 2000:
-                problemas.append("Chrome se extiende más allá del alto esperado")
+                problemas.append("Navegador se extiende más allá del alto esperado")
                 
             if problemas:
                 print(f"\n⚠️  PROBLEMAS DETECTADOS:")
@@ -1660,10 +1698,12 @@ class Calibrator:
                     print(f"   - {problema}")
                 print(f"\n💡 SOLUCIONES RECOMENDADAS:")
                 print(f"   1. Ejecuta 'Normalizar ventana de Chrome' desde el menú")
-                print(f"   2. Asegúrate que Chrome esté visible y no minimizado")
+                print(f"   2. Asegúrate que el navegador esté visible y no minimizado")
                 print(f"   3. Cierra otras ventanas que puedan interferir")
+                print(f"   4. Si usas stake.com, asegúrate que esté en el título de la pestaña")
             else:
-                print(f"\n✅ No se detectaron problemas obvios con Chrome")
+                print(f"\n✅ No se detectaron problemas obvios con el navegador")
+                print(f"\n💡 SIGUIENTE PASO: Ejecuta calibración completa (opción 1)")
                 
         except Exception as e:
             print(f"❌ Error durante diagnóstico: {e}")
