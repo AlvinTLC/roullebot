@@ -1364,9 +1364,9 @@ class Calibrator:
             traceback.print_exc()
     
     def diagnose_chrome_position(self):
-        \"\"\"Diagnóstica problemas con la posición de Chrome\"\"\"
-        print(\"\\n🔍 DIAGNÓSTICO DE POSICIÓN DE CHROME\")
-        print(\"=\" * 50)
+        """Diagnóstica problemas con la posición de Chrome"""
+        print("\n🔍 DIAGNÓSTICO DE POSICIÓN DE CHROME")
+        print("=" * 50)
         
         try:
             # Obtener información actual de Chrome
@@ -1374,49 +1374,49 @@ class Calibrator:
             chrome_window = window_manager.find_chrome_window()
             
             if not chrome_window:
-                print(\"❌ No se encuentra ventana de Chrome abierta\")
+                print("❌ No se encuentra ventana de Chrome abierta")
                 return
                 
-            print(f\"📊 CHROME ACTUAL:\")
-            print(f\"   Posición: ({chrome_window['x']}, {chrome_window['y']})\")
-            print(f\"   Tamaño: {chrome_window['width']}x{chrome_window['height']}\")
+            print(f"📊 CHROME ACTUAL:")
+            print(f"   Posición: ({chrome_window['x']}, {chrome_window['y']})")
+            print(f"   Tamaño: {chrome_window['width']}x{chrome_window['height']}")
             
             # Probar detección sin normalizar
             chrome_region_raw = obtener_region_chrome(normalize=False)
-            print(f\"\\n📊 REGIÓN SIN NORMALIZAR:\")
-            print(f\"   left={chrome_region_raw['left']}, top={chrome_region_raw['top']}\")
-            print(f\"   width={chrome_region_raw['width']}, height={chrome_region_raw['height']}\")
+            print(f"\n📊 REGIÓN SIN NORMALIZAR:")
+            print(f"   left={chrome_region_raw['left']}, top={chrome_region_raw['top']}")
+            print(f"   width={chrome_region_raw['width']}, height={chrome_region_raw['height']}")
             
             # Probar detección con normalización
             chrome_region_norm = obtener_region_chrome(normalize=True)
-            print(f\"\\n📊 REGIÓN NORMALIZADA:\")
-            print(f\"   left={chrome_region_norm['left']}, top={chrome_region_norm['top']}\")
-            print(f\"   width={chrome_region_norm['width']}, height={chrome_region_norm['height']}\")
+            print(f"\n📊 REGIÓN NORMALIZADA:")
+            print(f"   left={chrome_region_norm['left']}, top={chrome_region_norm['top']}")
+            print(f"   width={chrome_region_norm['width']}, height={chrome_region_norm['height']}")
             
             # Detectar problemas comunes
             problemas = []
             if chrome_region_norm['left'] < 0:
-                problemas.append(\"Chrome está fuera del borde izquierdo de pantalla\")
+                problemas.append("Chrome está fuera del borde izquierdo de pantalla")
             if chrome_region_norm['top'] < 0:
-                problemas.append(\"Chrome está fuera del borde superior de pantalla\")
+                problemas.append("Chrome está fuera del borde superior de pantalla")
             if chrome_region_norm['left'] + chrome_region_norm['width'] > 3000:
-                problemas.append(\"Chrome se extiende más allá del ancho esperado\")
+                problemas.append("Chrome se extiende más allá del ancho esperado")
             if chrome_region_norm['top'] + chrome_region_norm['height'] > 2000:
-                problemas.append(\"Chrome se extiende más allá del alto esperado\")
+                problemas.append("Chrome se extiende más allá del alto esperado")
                 
             if problemas:
-                print(f\"\\n⚠️  PROBLEMAS DETECTADOS:\")
+                print(f"\n⚠️  PROBLEMAS DETECTADOS:")
                 for problema in problemas:
-                    print(f\"   - {problema}\")
-                print(f\"\\n💡 SOLUCIONES RECOMENDADAS:\")
-                print(f\"   1. Ejecuta 'Normalizar ventana de Chrome' desde el menú\")
-                print(f\"   2. Asegúrate que Chrome esté visible y no minimizado\")
-                print(f\"   3. Cierra otras ventanas que puedan interferir\")
+                    print(f"   - {problema}")
+                print(f"\n💡 SOLUCIONES RECOMENDADAS:")
+                print(f"   1. Ejecuta 'Normalizar ventana de Chrome' desde el menú")
+                print(f"   2. Asegúrate que Chrome esté visible y no minimizado")
+                print(f"   3. Cierra otras ventanas que puedan interferir")
             else:
-                print(f\"\\n✅ No se detectaron problemas obvios con Chrome\")
+                print(f"\n✅ No se detectaron problemas obvios con Chrome")
                 
         except Exception as e:
-            print(f\"❌ Error durante diagnóstico: {e}\")
+            print(f"❌ Error durante diagnóstico: {e}")
             import traceback
             traceback.print_exc()
     
