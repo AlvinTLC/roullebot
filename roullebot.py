@@ -8,6 +8,7 @@ import sys
 import os
 import platform
 import argparse
+import json
 from pathlib import Path
 
 # Configuración del path
@@ -15,6 +16,29 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config.platform_config import config
 
+
+def show_config_info():
+    """Muestra información sobre la configuración"""
+    print(f"\n📁 DIRECTORIOS DE CONFIGURACIÓN:")
+    print(f"   Sistema operativo: {config.system.upper()}")
+    print(f"   Directorio config: {config.config_dir}")
+    print(f"   Archivo calibración: {config.config_dir / 'calibration.json'}")
+    
+    calib_file = config.config_dir / 'calibration.json'
+    if calib_file.exists():
+        print(f"\n✅ Archivo de calibración encontrado")
+        try:
+            with open(calib_file, 'r') as f:
+                data = json.load(f)
+                print(f"   Regiones configuradas: {list(data.keys())}")
+                if 'winner_region' in data:
+                    wr = data['winner_region']
+                    print(f"   Winner region: x={wr.get('x')}, y={wr.get('y')}, size={wr.get('width')}x{wr.get('height')}")
+        except Exception as e:
+            print(f"   ⚠️ Error leyendo archivo: {e}")
+    else:
+        print(f"\n⚠️ No hay archivo de calibración")
+        print(f"   Ejecuta: python roullebot.py --mode calibrate")
 
 def check_dependencies():
     """Verifica que todas las dependencias estén instaladas"""
@@ -88,6 +112,10 @@ def main():
         return 1
     
     print("\n✅ Todas las dependencias están instaladas!")
+    print("-" * 50)
+    
+    # Mostrar información de configuración
+    show_config_info()
     print("-" * 50)
     
     # Importar módulos según el modo
