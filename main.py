@@ -457,6 +457,13 @@ def main():
                             'height': optimal_height
                         }
                         
+                        # DEBUG: Mostrar ajuste cada 100 frames para verificar
+                        if contador_scans % 100 == 0:
+                            print(f"🔍 DEBUG Region Adjustment:")
+                            print(f"   Original: ({region_numero['x']}, {region_numero['y']}) {region_numero['width']}x{region_numero['height']}")
+                            print(f"   Center: ({center_x}, {center_y})")
+                            print(f"   Adjusted: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']}) {adjusted_winner_region['width']}x{adjusted_winner_region['height']}")
+                        
                         screenshot = capture_screen(adjusted_winner_region)
                         img_ganador = np.array(screenshot)
                         
@@ -465,8 +472,15 @@ def main():
 
                         if img_ganador is not None and img_ganador.size > 0:
                             numero_ganador = detect_number_from_image(img_ganador).strip()
+                            
+                            # DEBUG: Mostrar resultado OCR cada 200 frames
+                            if contador_scans % 200 == 0:
+                                print(f"🔍 DEBUG OCR: '{numero_ganador}' (size: {img_ganador.shape})")
+                                
                             if numero_ganador:
                                 detector.procesar_numero(numero_ganador)
+                            elif contador_scans % 500 == 0:
+                                print(f"⚠️ OCR sin resultado en frame {contador_scans}")
 
                         # Capturar countdown a la MISMA frecuencia para sincronizar preview
                         if region_countdown:  # Sin reducir frecuencia para mejor sync
