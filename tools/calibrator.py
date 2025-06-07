@@ -9,6 +9,7 @@ import pyautogui
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -402,7 +403,11 @@ class Calibrator:
         """Prueba rápida de captura de pantalla para debugging"""
         print("\n🧪 PRUEBA RÁPIDA DE CAPTURA")
         print("=" * 50)
-        print("Presiona ESPACIO para capturar, Q para salir")
+        print("Controles:")
+        print("  ESPACIO: Capturar imagen")
+        print("  A: Captura automática continua")
+        print("  S: Parar captura automática")
+        print("  Q/ESC: Salir")
         
         try:
             chrome_region = obtener_region_chrome()
@@ -424,27 +429,100 @@ class Calibrator:
         cv2.namedWindow('Test Captura', cv2.WINDOW_NORMAL)
         if config.system == 'darwin':
             cv2.moveWindow('Test Captura', 100, 100)
+            cv2.resizeWindow('Test Captura', 600, 400)
+        
+        # Variables para captura automática
+        auto_capture = False
+        capture_count = 0
+        last_capture_time = 0
+        
+        # Captura inicial para mostrar algo
+        print("📸 Captura inicial...")
+        try:
+            img = capture_screen(test_region)
+            if img is not None and img.size > 0:
+                big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
+                                   interpolation=cv2.INTER_NEAREST)
+                cv2.imshow('Test Captura', big_img)
+                print(f"✅ Captura inicial exitosa: {img.shape}")
+            else:
+                # Mostrar imagen en negro si falla
+                black_img = np.zeros((420, 600, 3), dtype=np.uint8)
+                cv2.putText(black_img, "No se pudo capturar", (50, 200), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.imshow('Test Captura', black_img)
+                print("❌ Captura inicial falló")
+        except Exception as e:
+            print(f"❌ Error en captura inicial: {e}")
+        
+        print("\n🎮 Ventana lista. Usa los controles para probar...")
         
         while True:
-            key = cv2.waitKey(1 if config.system == 'darwin' else 30) & 0xFF
+            current_time = time.time()
             
-            if key == ord(' '):
-                print("📸 Capturando...")
+            # Captura automática cada 500ms
+            if auto_capture and (current_time - last_capture_time) > 0.5:
+                capture_count += 1
                 try:
                     img = capture_screen(test_region)
                     if img is not None and img.size > 0:
-                        # Mostrar imagen ampliada
-                        big_img = cv2.resize(img, (img.shape[1]*8, img.shape[0]*8), 
+                        big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
                                            interpolation=cv2.INTER_NEAREST)
+                        
+                        # Añadir contador
+                        cv2.putText(big_img, f"Auto #{capture_count}", (10, 30), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.putText(big_img, "Presiona 'S' para parar", (10, 60), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        
                         cv2.imshow('Test Captura', big_img)
-                        print(f"✅ Captura exitosa: {img.shape}")
-                    else:
-                        print("❌ Captura falló - imagen vacía")
+                        if capture_count % 10 == 0:
+                            print(f"📸 Auto-captura #{capture_count}")
+                    last_capture_time = current_time
                 except Exception as e:
-                    print(f"❌ Error en captura: {e}")
-                    
-            elif key == ord('q') or key == 27:
+                    print(f"❌ Error en auto-captura: {e}")
+            
+            # Manejo de teclas con timeout más corto para mejor responsividad
+            key = cv2.waitKey(30) & 0xFF
+            
+            # Verificar si la ventana sigue abierta
+            try:
+                if cv2.getWindowProperty('Test Captura', cv2.WND_PROP_VISIBLE) < 1:
+                    print("❌ Ventana cerrada")
+                    break
+            except:
                 break
+            
+            if key == ord(' '):
+                print("📸 Captura manual...")
+                try:
+                    img = capture_screen(test_region)
+                    if img is not None and img.size > 0:
+                        big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
+                                           interpolation=cv2.INTER_NEAREST)
+                        cv2.putText(big_img, "Captura Manual", (10, 30), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        cv2.imshow('Test Captura', big_img)
+                        print(f"✅ Captura manual exitosa: {img.shape}")
+                    else:
+                        print("❌ Captura manual falló - imagen vacía")
+                except Exception as e:
+                    print(f"❌ Error en captura manual: {e}")
+                    
+            elif key == ord('a'):
+                auto_capture = True
+                capture_count = 0
+                print("🔄 Captura automática ACTIVADA (cada 500ms)")
+                
+            elif key == ord('s'):
+                auto_capture = False
+                print("⏹️  Captura automática DETENIDA")
+                
+            elif key == ord('q') or key == 27:
+                print("👋 Saliendo...")
+                break
+            elif key != 255:  # Cualquier otra tecla
+                print(f"🔍 Tecla presionada: {key} (char: {chr(key) if 32 <= key <= 126 else 'special'})")
         
         cv2.destroyAllWindows()
         print("✅ Prueba de captura completada")
