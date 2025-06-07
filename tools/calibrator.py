@@ -450,6 +450,11 @@ class Calibrator:
         debug_mode = False
         frame_count = 0
         
+        # Variables para FPS counter
+        fps_counter = 0
+        fps_start_time = time.time()
+        fps_actual = 0
+        
         # Variables para mover región
         move_step = 5  # Pixeles por movimiento
         region_modified = False
@@ -581,6 +586,19 @@ class Calibrator:
                     cv2.putText(combined, f"Regiones: {regions_text}", 
                                (10, y_text + 145), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
                     
+                    # Calcular y mostrar FPS
+                    fps_counter += 1
+                    current_time = time.time()
+                    if current_time - fps_start_time >= 1.0:
+                        fps_actual = fps_counter
+                        fps_counter = 0
+                        fps_start_time = current_time
+                    
+                    # Mostrar FPS en esquina superior derecha
+                    cv2.putText(combined, f"{fps_actual} FPS", 
+                               (combined.shape[1] - 80, 30), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
                     cv2.imshow(main_window, combined)
                     
                     # Forzar actualización de ventana en macOS
@@ -593,8 +611,8 @@ class Calibrator:
                 import traceback
                 traceback.print_exc()
             
-            # Manejo de eventos optimizado para macOS
-            wait_time = 1 if config.system == 'darwin' else 30
+            # Manejo de eventos con alto FPS (30+ FPS)
+            wait_time = 1  # 1ms para máximo FPS en todas las plataformas
             key = cv2.waitKey(wait_time) & 0xFF
             
             # También verificar si alguna ventana fue cerrada
@@ -896,8 +914,8 @@ class Calibrator:
                 cv2.imshow('Test Calibración Real', display_img)
                 last_capture_time = current_time
             
-            # Manejo de teclas con timeout más corto para mejor responsividad
-            key = cv2.waitKey(30) & 0xFF
+            # Manejo de teclas con timeout mínimo para 30+ FPS
+            key = cv2.waitKey(1) & 0xFF
             
             # Verificar si la ventana sigue abierta
             try:

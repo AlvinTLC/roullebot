@@ -169,7 +169,7 @@ class PlatformConfig:
                 'capture_method': 'mss',  # Más rápido en Windows
                 'opencv_threads': 4,      # Usar múltiples threads
                 'capture_interval': 0.02, # 50 FPS máximo
-                'preview_interval': 0.033,  # Preview a 30 FPS (1/30 = 0.033s)
+                'preview_interval': 0.016,  # Preview a 60 FPS (1/60 = 0.016s)
                 'ocr_threads': 2,         # OCR en paralelo
                 'resize_before_ocr': True,# Redimensionar antes de OCR
                 'skip_frames': 2,         # Procesar 1 de cada 2 frames
@@ -181,7 +181,7 @@ class PlatformConfig:
                 'capture_method': 'mss',
                 'opencv_threads': 2,
                 'capture_interval': 0.03,
-                'preview_interval': 0.2,
+                'preview_interval': 0.033,  # Preview a 30 FPS para macOS
                 'ocr_threads': 1,
                 'resize_before_ocr': False,
                 'skip_frames': 1,
@@ -193,7 +193,7 @@ class PlatformConfig:
                 'capture_method': 'mss',
                 'opencv_threads': 2,
                 'capture_interval': 0.025,
-                'preview_interval': 0.15,
+                'preview_interval': 0.033,  # Preview a 30 FPS para Linux
                 'ocr_threads': 2,
                 'resize_before_ocr': True,
                 'skip_frames': 1,

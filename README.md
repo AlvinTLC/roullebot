@@ -93,7 +93,7 @@ Opciones de calibración:
 
 ### Ejecutar el Bot
 
-#### Modo Normal (CON preview visual a 30 FPS)
+#### Modo Normal (CON preview visual de alta frecuencia)
 ```bash
 python roullebot.py --mode run
 ```
@@ -101,7 +101,9 @@ python roullebot.py --mode run
 - 📊 Estadísticas visuales completas  
 - 🎮 Controles interactivos (1-9, R, N, D)
 - ⚡ ~50 FPS de detección
-- 📺 Ventana de preview a 30 FPS
+- 📺 Ventana de preview:
+  - Windows: 60 FPS
+  - macOS/Linux: 30+ FPS
 
 #### Modo Ultra Rápido (SIN preview - máximo rendimiento)
 ```bash

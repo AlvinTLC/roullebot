@@ -311,7 +311,8 @@ def main():
     # Obtener configuraciones de rendimiento
     perf_settings = config.get_performance_settings()
     print(f"⚡ Configuración de rendimiento cargada:")
-    print(f"   - Captura: cada {perf_settings['capture_interval']*1000:.0f}ms")
+    print(f"   - Captura: cada {perf_settings['capture_interval']*1000:.0f}ms ({int(1/perf_settings['capture_interval'])} FPS)")
+    print(f"   - Preview: cada {perf_settings['preview_interval']*1000:.0f}ms ({int(1/perf_settings['preview_interval'])} FPS)")
     print(f"   - OpenCV threads: {perf_settings['opencv_threads']}")
     print(f"   - Saltear frames: 1 de cada {perf_settings['skip_frames']}")
     print(f"   - Prioridad alta: {'SÍ' if perf_settings['priority_boost'] else 'NO'}")
@@ -414,6 +415,11 @@ def main():
     last_capture_time = 0
     last_preview_time = 0
     memory_cleanup_counter = 0
+    
+    # Variables para contador de FPS del preview
+    preview_fps_counter = 0
+    preview_fps_start_time = time.time()
+    preview_fps_actual = 0
 
     try:
         while True:
@@ -583,6 +589,17 @@ def main():
                         ultimo_ganador = detector.historial_ganadores[-1][1]
                         cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 370), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    
+                    # Calcular FPS real del preview
+                    preview_fps_counter += 1
+                    if current_time - preview_fps_start_time >= 1.0:
+                        preview_fps_actual = preview_fps_counter
+                        preview_fps_counter = 0
+                        preview_fps_start_time = current_time
+                    
+                    # Mostrar FPS del preview
+                    cv2.putText(display_img, f"Preview: {preview_fps_actual} FPS", (320, 390), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 255, 100), 1)
 
                     cv2.imshow("RouletteBot - Live Preview", display_img)
                     last_preview_time = current_time
