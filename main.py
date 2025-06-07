@@ -52,12 +52,12 @@ def apostar_al_numero(numero='24', calibration_data=None):
         
         try:
             # Opcional: mover mouse primero para debug visual (con validación)
-            if 0 <= x <= 3000 and 0 <= y <= 2000:  # Validar coordenadas razonables
+            if 0 <= x <= 5000 and 0 <= y <= 3000:  # Validar coordenadas razonables
                 pyautogui.moveTo(x, y)
                 time.sleep(0.1)  # Breve pausa para ver el movimiento
                 pyautogui.click(x, y)
             else:
-                print(f"⚠️ Coordenadas fuera de rango: ({x}, {y})")
+                print(f"⚠️ Coordenadas fuera de rango válido [0-5000, 0-3000]: ({x}, {y})")
                 return False
         finally:
             # Restaurar fail-safe

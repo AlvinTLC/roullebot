@@ -48,13 +48,13 @@ def apostar_al_numero(numero='24', calibration_data=None):
         pyautogui.FAILSAFE = False
         
         try:
-            if 0 <= x <= 3000 and 0 <= y <= 2000:  # Validar coordenadas
+            if 0 <= x <= 5000 and 0 <= y <= 3000:  # Validar coordenadas
                 pyautogui.click(x, y)
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 print(f"💰 [{timestamp}] ✅ BET PLACED #{numero} at ({x}, {y})")
                 return True
             else:
-                print(f"⚠️ Invalid coordinates: ({x}, {y})")
+                print(f"⚠️ Coordenadas fuera de rango válido [0-5000, 0-3000]: ({x}, {y})")
                 return False
         finally:
             pyautogui.FAILSAFE = original_failsafe

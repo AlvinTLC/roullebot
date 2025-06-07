@@ -72,7 +72,7 @@ class Calibrator:
             region = self.calibration_data.get(region_name)
             if region and isinstance(region, dict):
                 x, y = region.get('x', 0), region.get('y', 0)
-                if not (0 <= x <= 3000 and 0 <= y <= 2000):
+                if not (0 <= x <= 5000 and 0 <= y <= 3000):
                     issues.append(f"❌ {region_name}: coordenadas fuera de rango ({x}, {y})")
         
         # Validar posiciones de apuesta
@@ -80,7 +80,7 @@ class Calibrator:
         for numero, pos in bet_positions.items():
             if pos and isinstance(pos, dict):
                 x, y = pos.get('x', 0), pos.get('y', 0)
-                if not (0 <= x <= 3000 and 0 <= y <= 2000):
+                if not (0 <= x <= 5000 and 0 <= y <= 3000):
                     issues.append(f"❌ Bet position #{numero}: coordenadas fuera de rango ({x}, {y})")
         
         if issues:
@@ -950,7 +950,7 @@ class Calibrator:
             for numero, pos in bet_positions.items():
                 if pos and 'x' in pos and 'y' in pos:
                     x, y = pos['x'], pos['y']
-                    if 0 <= x <= 3000 and 0 <= y <= 2000:
+                    if 0 <= x <= 5000 and 0 <= y <= 3000:
                         print(f"📍 Moviendo a número {numero}: ({x}, {y})")
                         pyautogui.moveTo(x, y)
                         time.sleep(1.5)
@@ -960,6 +960,279 @@ class Calibrator:
             pyautogui.FAILSAFE = original_failsafe
                 
         print("✅ Test completado. ¿Las posiciones eran correctas?")
+    
+    def auto_detect_roulette_numbers(self):
+        """Auto-detecta las posiciones de los 36 números de la ruleta"""
+        print("\n🔍 AUTO-DETECTOR DE NÚMEROS DE RULETA")
+        print("=" * 60)
+        print("Este proceso intentará encontrar automáticamente los 36 números.")
+        print("Necesitarás marcar el área aproximada de la grilla de números.")
+        print("\n📋 INSTRUCCIONES:")
+        print("1. Se abrirá una ventana con la imagen de Chrome")
+        print("2. Dibuja un rectángulo alrededor de TODA la grilla de números")
+        print("3. Click en esquina superior izquierda de la grilla")
+        print("4. Click en esquina inferior derecha de la grilla")
+        print("5. El sistema detectará automáticamente los 36 números")
+        
+        try:
+            chrome_region = obtener_region_chrome()
+            print(f"\n✅ Chrome detectado: {chrome_region}")
+        except Exception as e:
+            print(f"❌ Error detectando Chrome: {e}")
+            return
+        
+        # Variables para la selección del área
+        clicks = []
+        selecting = True
+        
+        def mouse_callback(event, x, y, flags, param):
+            nonlocal selecting
+            if event == cv2.EVENT_LBUTTONDOWN and selecting:
+                abs_x = chrome_region['left'] + x
+                abs_y = chrome_region['top'] + y
+                clicks.append({'x': x, 'y': y, 'abs_x': abs_x, 'abs_y': abs_y})
+                
+                if len(clicks) == 1:
+                    print(f"✅ Esquina superior izquierda: ({abs_x}, {abs_y})")
+                    print("👆 Ahora click en esquina inferior derecha de la grilla")
+                elif len(clicks) == 2:
+                    print(f"✅ Esquina inferior derecha: ({abs_x}, {abs_y})")
+                    print("🔍 Analizando grilla... Presiona ESPACIO para procesar")
+                    selecting = False
+        
+        cv2.namedWindow('Auto-Detector Ruleta')
+        cv2.setMouseCallback('Auto-Detector Ruleta', mouse_callback)
+        
+        print(f"\n👆 Click en la esquina SUPERIOR IZQUIERDA de la grilla de números")
+        
+        while True:
+            # Capturar pantalla
+            screenshot = capture_screen(chrome_region)
+            img = np.array(screenshot)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
+            # Dibujar grilla de ayuda
+            height, width = img.shape[:2]
+            grid_size = 30
+            for x in range(0, width, grid_size):
+                cv2.line(img, (x, 0), (x, height), (100, 100, 100), 1)
+            for y in range(0, height, grid_size):
+                cv2.line(img, (0, y), (width, y), (100, 100, 100), 1)
+            
+            # Mostrar clicks
+            for i, click in enumerate(clicks):
+                color = (0, 255, 0) if i == 0 else (0, 0, 255)
+                label = "TOP-LEFT" if i == 0 else "BOTTOM-RIGHT"
+                cv2.circle(img, (click['x'], click['y']), 8, color, -1)
+                cv2.putText(img, label, (click['x']+15, click['y']-10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            # Dibujar rectángulo si tenemos 2 clicks
+            if len(clicks) == 2:
+                pt1 = (clicks[0]['x'], clicks[0]['y'])
+                pt2 = (clicks[1]['x'], clicks[1]['y'])
+                cv2.rectangle(img, pt1, pt2, (255, 255, 0), 2)
+                
+                # Mostrar información
+                width_area = abs(clicks[1]['x'] - clicks[0]['x'])
+                height_area = abs(clicks[1]['y'] - clicks[0]['y'])
+                cv2.putText(img, f"Grilla: {width_area}x{height_area} px", 
+                           (clicks[0]['x'], clicks[0]['y']-20),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            
+            # Instrucciones en pantalla
+            if len(clicks) == 0:
+                cv2.putText(img, "Click: Esquina superior izquierda", (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            elif len(clicks) == 1:
+                cv2.putText(img, "Click: Esquina inferior derecha", (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            else:
+                cv2.putText(img, "Presiona ESPACIO para detectar numeros", (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+            
+            cv2.imshow('Auto-Detector Ruleta', img)
+            
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                print("❌ Auto-detección cancelada")
+                cv2.destroyAllWindows()
+                return
+            elif key == ord(' ') and len(clicks) == 2:
+                # Procesar la detección
+                self._process_roulette_grid(chrome_region, clicks)
+                break
+        
+        cv2.destroyAllWindows()
+    
+    def _process_roulette_grid(self, chrome_region, clicks):
+        """Procesa la grilla y detecta las posiciones de los números"""
+        print("\n🔍 PROCESANDO GRILLA DE NÚMEROS...")
+        
+        # Calcular área de la grilla
+        x1, y1 = clicks[0]['abs_x'], clicks[0]['abs_y']
+        x2, y2 = clicks[1]['abs_x'], clicks[1]['abs_y']
+        
+        # Asegurar que x1,y1 sea top-left y x2,y2 sea bottom-right
+        grid_left = min(x1, x2)
+        grid_top = min(y1, y2)
+        grid_right = max(x1, x2)
+        grid_bottom = max(y1, y2)
+        
+        grid_width = grid_right - grid_left
+        grid_height = grid_bottom - grid_top
+        
+        print(f"📐 Área de grilla: {grid_width}x{grid_height} px")
+        print(f"📍 Posición: ({grid_left}, {grid_top}) a ({grid_right}, {grid_bottom})")
+        
+        # Validar que el área de la grilla sea razonable
+        if grid_width < 200 or grid_height < 60:
+            print(f"⚠️ ADVERTENCIA: Área de grilla muy pequeña. Asegúrate de cubrir toda la grilla de números.")
+            print(f"   Tamaño mínimo recomendado: 200x60 px")
+        
+        # Layout típico de ruleta europea (3 filas x 12 columnas)
+        rows = 3
+        cols = 12
+        
+        # Calcular tamaño de cada celda
+        cell_width = grid_width / cols
+        cell_height = grid_height / rows
+        
+        print(f"🔲 Tamaño de celda: {cell_width:.1f}x{cell_height:.1f} px")
+        
+        # Calcular posición del 0 y mostrar debug
+        zero_x_calculated = grid_left + (grid_width / 2)
+        zero_y_calculated = grid_top - (cell_height / 2)
+        zero_y_final = max(10, zero_y_calculated)
+        
+        print(f"🔍 DEBUG posición del 0:")
+        print(f"   X calculada: {zero_x_calculated:.1f}")
+        print(f"   Y calculada: {zero_y_calculated:.1f}")
+        print(f"   Y final (min 10): {zero_y_final:.1f}")
+        
+        # Mapeo de números de ruleta europea estándar
+        # Fila superior (1-34 números impares), medio (2-35 pares), inferior (3-36 múltiplos de 3)
+        roulette_layout = [
+            # Fila 1 (superior)
+            [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
+            # Fila 2 (medio)  
+            [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+            # Fila 3 (inferior)
+            [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+        ]
+        
+        detected_positions = {}
+        
+        # Detectar posición de cada número
+        for row in range(rows):
+            for col in range(cols):
+                numero = roulette_layout[row][col]
+                
+                # Calcular centro de la celda
+                center_x = grid_left + (col * cell_width) + (cell_width / 2)
+                center_y = grid_top + (row * cell_height) + (cell_height / 2)
+                
+                detected_positions[str(numero)] = {
+                    'x': int(center_x),
+                    'y': int(center_y),
+                    'row': row,
+                    'col': col
+                }
+        
+        # Agregar posición del 0 (normalmente arriba de la grilla)
+        detected_positions['0'] = {
+            'x': int(zero_x_calculated),
+            'y': int(zero_y_final),
+            'row': -1,
+            'col': 6  # Centro
+        }
+        
+        print(f"\n✅ Detectados {len(detected_positions)} números!")
+        
+        # Mostrar algunos ejemplos y verificar rangos
+        ejemplos = ['0', '1', '18', '24', '36']
+        fuera_de_rango = []
+        
+        for num in ejemplos:
+            if num in detected_positions:
+                pos = detected_positions[num]
+                x, y = pos['x'], pos['y']
+                print(f"   #{num}: ({x}, {y})")
+                
+                # Verificar si está fuera de rango
+                if not (0 <= x <= 5000 and 0 <= y <= 3000):
+                    fuera_de_rango.append(f"#{num}: ({x}, {y})")
+        
+        # Verificar todos los números para problemas de rango
+        total_fuera_rango = 0
+        for num, pos in detected_positions.items():
+            x, y = pos['x'], pos['y']
+            if not (0 <= x <= 5000 and 0 <= y <= 3000):
+                total_fuera_rango += 1
+                
+        if total_fuera_rango > 0:
+            print(f"⚠️ ADVERTENCIA: {total_fuera_rango} números tienen coordenadas fuera del rango válido")
+            print(f"   Rango válido: X=[0-5000], Y=[0-3000]")
+            print(f"   💡 Sugerencia: Asegúrate de que la grilla esté completamente dentro de la pantalla")
+            print(f"   💡 Si el número 0 está fuera de rango, quizás está demasiado arriba de la grilla")
+        else:
+            print(f"✅ Todas las coordenadas están dentro del rango válido")
+        
+        # Preguntar si guardar
+        print(f"\n💾 ¿Guardar las {len(detected_positions)} posiciones detectadas?")
+        respuesta = input("Escribe 'si' para guardar, 'test' para probar, o Enter para cancelar: ").strip().lower()
+        
+        if respuesta == 'si':
+            # Guardar en calibración
+            if 'bet_positions' not in self.calibration_data:
+                self.calibration_data['bet_positions'] = {}
+            
+            self.calibration_data['bet_positions'].update(detected_positions)
+            self.save_calibration()
+            print(f"✅ ¡{len(detected_positions)} posiciones guardadas!")
+            
+        elif respuesta == 'test':
+            # Probar las posiciones detectadas
+            self._test_detected_positions(detected_positions)
+            
+            # Preguntar de nuevo si guardar después del test
+            if input("\n¿Las posiciones se ven correctas? (si/no): ").strip().lower() == 'si':
+                if 'bet_positions' not in self.calibration_data:
+                    self.calibration_data['bet_positions'] = {}
+                self.calibration_data['bet_positions'].update(detected_positions)
+                self.save_calibration()
+                print(f"✅ ¡{len(detected_positions)} posiciones guardadas!")
+        else:
+            print("❌ Detección cancelada")
+    
+    def _test_detected_positions(self, positions):
+        """Prueba las posiciones detectadas moviendo el mouse"""
+        print("\n🧪 PROBANDO POSICIONES DETECTADAS")
+        print("El mouse se moverá a cada número...")
+        
+        # Desactivar fail-safe
+        original_failsafe = pyautogui.FAILSAFE
+        pyautogui.FAILSAFE = False
+        
+        try:
+            # Ordenar números para un recorrido lógico
+            numeros_ordenados = ['0'] + [str(i) for i in range(1, 37)]
+            
+            for numero in numeros_ordenados:
+                if numero in positions:
+                    pos = positions[numero]
+                    x, y = pos['x'], pos['y']
+                    
+                    if 0 <= x <= 5000 and 0 <= y <= 3000:
+                        print(f"📍 #{numero}: ({x}, {y})")
+                        pyautogui.moveTo(x, y)
+                        time.sleep(0.3)  # Pausa más rápida
+                    else:
+                        print(f"⚠️ #{numero}: coordenadas fuera de rango ({x}, {y})")
+        finally:
+            pyautogui.FAILSAFE = original_failsafe
+        
+        print("✅ Test completado")
 
 def run_calibration():
     """Función principal de calibración"""
@@ -973,10 +1246,11 @@ def run_calibration():
         print("3. Probar calibración actual")
         print("4. Ver calibración guardada")
         print("5. Test de posiciones de apuesta (mouse)")
-        print("6. Prueba rápida de captura (debug)")
-        print("7. Salir")
+        print("6. 🚀 AUTO-DETECTOR de 37 números (0-36)")
+        print("7. Prueba rápida de captura (debug)")
+        print("8. Salir")
         
-        choice = input("\nSelecciona una opción (1-7): ").strip()
+        choice = input("\nSelecciona una opción (1-8): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -991,8 +1265,10 @@ def run_calibration():
         elif choice == '5':
             calibrator.test_bet_positions()
         elif choice == '6':
-            calibrator._test_screen_capture()
+            calibrator.auto_detect_roulette_numbers()
         elif choice == '7':
+            calibrator._test_screen_capture()
+        elif choice == '8':
             print("👋 Hasta luego!")
             break
         else:
