@@ -487,18 +487,36 @@ class Calibrator:
                 
                 # Región ganadora arriba
                 if images['winner'] is not None:
-                    winner_img = cv2.resize(images['winner'], (400, 280), 
+                    # Convertir a BGR si es necesario
+                    winner_array = np.array(images['winner'])
+                    if len(winner_array.shape) == 3 and winner_array.shape[2] == 3:
+                        winner_bgr = cv2.cvtColor(winner_array, cv2.COLOR_RGB2BGR)
+                    else:
+                        winner_bgr = winner_array
+                    
+                    winner_img = cv2.resize(winner_bgr, (400, 280), 
                                           interpolation=cv2.INTER_NEAREST)
-                    display_img[10:290, 10:410] = winner_img
+                    # Asegurar que las dimensiones coincidan
+                    if winner_img.shape[:2] == (280, 400):
+                        display_img[10:290, 10:410] = winner_img
                 
                 cv2.putText(display_img, f"WINNER: {detections['winner']}", (10, 310), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                 
                 # Región countdown abajo
                 if images['countdown'] is not None:
-                    countdown_img = cv2.resize(images['countdown'], (400, 280), 
+                    # Convertir a BGR si es necesario
+                    countdown_array = np.array(images['countdown'])
+                    if len(countdown_array.shape) == 3 and countdown_array.shape[2] == 3:
+                        countdown_bgr = cv2.cvtColor(countdown_array, cv2.COLOR_RGB2BGR)
+                    else:
+                        countdown_bgr = countdown_array
+                    
+                    countdown_img = cv2.resize(countdown_bgr, (400, 280), 
                                              interpolation=cv2.INTER_NEAREST)
-                    display_img[330:610, 10:410] = countdown_img
+                    # Asegurar que las dimensiones coincidan
+                    if countdown_img.shape[:2] == (280, 400):
+                        display_img[330:610, 10:410] = countdown_img
                 elif countdown_region:
                     cv2.putText(display_img, "Error capturando countdown", (10, 450), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
@@ -537,31 +555,41 @@ class Calibrator:
             # Capturar región ganadora
             try:
                 img_winner = capture_screen(winner_region)
-                if img_winner is not None and img_winner.size > 0:
-                    images['winner'] = img_winner
-                    number = detect_number_from_image(img_winner).strip()
+                if img_winner is not None and hasattr(img_winner, 'size') and img_winner.size > 0:
+                    # Convertir PIL a numpy array si es necesario
+                    if hasattr(img_winner, 'mode'):
+                        images['winner'] = np.array(img_winner)
+                    else:
+                        images['winner'] = img_winner
+                    
+                    number = detect_number_from_image(images['winner']).strip()
                     detections['winner'] = number if number else "N/A"
                 else:
                     images['winner'] = None
                     detections['winner'] = "ERROR"
             except Exception as e:
                 images['winner'] = None
-                detections['winner'] = f"ERROR: {e}"
+                detections['winner'] = f"ERROR: {str(e)[:50]}"
             
             # Capturar región countdown si existe
             if countdown_region:
                 try:
                     img_countdown = capture_screen(countdown_region)
-                    if img_countdown is not None and img_countdown.size > 0:
-                        images['countdown'] = img_countdown
-                        countdown = detect_number_from_image(img_countdown).strip()
+                    if img_countdown is not None and hasattr(img_countdown, 'size') and img_countdown.size > 0:
+                        # Convertir PIL a numpy array si es necesario
+                        if hasattr(img_countdown, 'mode'):
+                            images['countdown'] = np.array(img_countdown)
+                        else:
+                            images['countdown'] = img_countdown
+                        
+                        countdown = detect_number_from_image(images['countdown']).strip()
                         detections['countdown'] = countdown if countdown else "N/A"
                     else:
                         images['countdown'] = None
                         detections['countdown'] = "ERROR"
                 except Exception as e:
                     images['countdown'] = None
-                    detections['countdown'] = f"ERROR: {e}"
+                    detections['countdown'] = f"ERROR: {str(e)[:50]}"
             else:
                 images['countdown'] = None
                 detections['countdown'] = "NO CALIBRADO"
