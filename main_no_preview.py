@@ -181,9 +181,19 @@ class DetectorGanadoresRapido:
     def mostrar_stats_rapidas(self, total_scans):
         """Stats rápidas cada cierto tiempo"""
         self.contador_stats += 1
-        if self.contador_stats % 5000 == 0:  # Cada 5000 scans
+        
+        # Stats más frecuentes al inicio, luego menos frecuentes
+        if total_scans < 1000 and self.contador_stats % 500 == 0:  # Cada 500 scans los primeros 1000
             duracion = time.time() - self.inicio_sesion
-            fps = total_scans / duracion
+            fps = total_scans / duracion if duracion > 0 else 0
+            
+            print(f"\n📊 STARTING STATS [{datetime.now().strftime('%H:%M:%S')}]")
+            print(f"   Scans: {total_scans} | FPS: {fps:.1f} | Bets: {self.total_apuestas}")
+            print(f"   Target: {self.numero_objetivo} | Detections: {self.contador_detecciones_validas}")
+            
+        elif self.contador_stats % 5000 == 0:  # Cada 5000 scans después
+            duracion = time.time() - self.inicio_sesion
+            fps = total_scans / duracion if duracion > 0 else 0
             
             print(f"\n📊 QUICK STATS [{datetime.now().strftime('%H:%M:%S')}]")
             print(f"   Scans: {total_scans} | FPS: {fps:.1f} | Bets: {self.total_apuestas}")
@@ -242,8 +252,19 @@ def main_fast():
     try:
         region_chrome = obtener_region_chrome()
         print(f"✅ Chrome detectado: {region_chrome}")
+        
+        # Test inicial de captura
+        print("🧪 Testing initial capture...")
+        test_capture = capture_screen(region_numero)
+        if test_capture is not None:
+            print(f"✅ Initial capture successful: {np.array(test_capture).shape}")
+        else:
+            print("❌ Initial capture failed - no image returned")
+            
     except Exception as e:
         print(f"❌ Error detectando Chrome: {e}")
+        import traceback
+        traceback.print_exc()
         return
     
     # Usar regiones calibradas
@@ -279,6 +300,10 @@ def main_fast():
     try:
         print("🟢 STARTING ULTRA FAST MODE...")
         
+        # Debug inicial para verificar que el bucle funciona
+        debug_mode = True
+        debug_count = 0
+        
         while True:
             current_time = time.time()
             
@@ -287,29 +312,47 @@ def main_fast():
                 
                 if contador_scans % skip_frames == 0:
                     
-                    # Capturar región del número ganador
-                    screenshot = capture_screen(region_numero)
-                    img_ganador = np.array(screenshot)
+                    try:
+                        # Capturar región del número ganador
+                        screenshot = capture_screen(region_numero)
+                        img_ganador = np.array(screenshot)
+                        
+                        numero_ganador = ""
+                        countdown_actual = None
+
+                        if img_ganador is not None and img_ganador.size > 0:
+                            numero_ganador = detect_number_from_image(img_ganador).strip()
+                            if numero_ganador:
+                                detector.procesar_numero(numero_ganador)
+                            
+                            # Debug inicial
+                            if debug_mode and debug_count < 10:
+                                debug_count += 1
+                                print(f"🔍 Debug #{debug_count}: Winner region captured, size={img_ganador.shape}, detected='{numero_ganador}'")
+
+                        # Capturar countdown menos frecuente
+                        if region_countdown and contador_scans % 3 == 0:
+                            try:
+                                screenshot_countdown = capture_screen(region_countdown)
+                                img_countdown = np.array(screenshot_countdown)
+                                if img_countdown is not None and img_countdown.size > 0:
+                                    countdown_str = detect_number_from_image(img_countdown).strip()
+                                    if countdown_str:
+                                        countdown_actual = detector.procesar_countdown(countdown_str)
+                            except Exception as e:
+                                if debug_mode and debug_count < 5:
+                                    print(f"⚠️ Countdown error: {e}")
                     
-                    numero_ganador = ""
-                    countdown_actual = None
-
-                    if img_ganador is not None and img_ganador.size > 0:
-                        numero_ganador = detect_number_from_image(img_ganador).strip()
-                        if numero_ganador:
-                            detector.procesar_numero(numero_ganador)
-
-                    # Capturar countdown menos frecuente
-                    if region_countdown and contador_scans % 3 == 0:
-                        try:
-                            screenshot_countdown = capture_screen(region_countdown)
-                            img_countdown = np.array(screenshot_countdown)
-                            if img_countdown is not None and img_countdown.size > 0:
-                                countdown_str = detect_number_from_image(img_countdown).strip()
-                                if countdown_str:
-                                    countdown_actual = detector.procesar_countdown(countdown_str)
-                        except Exception as e:
-                            pass  # Silenciar errores para máximo rendimiento
+                    except Exception as e:
+                        if debug_mode and debug_count < 5:
+                            print(f"❌ Capture error: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        
+                        # Desactivar debug después de unos intentos
+                        if debug_count >= 10:
+                            debug_mode = False
+                            print("🔇 Debug mode OFF - switching to silent mode")
                 
                 last_capture_time = current_time
 
