@@ -400,14 +400,31 @@ class Calibrator:
                 print("✅ Nueva región guardada!")
     
     def _test_screen_capture(self):
-        """Prueba rápida de captura de pantalla para debugging"""
-        print("\n🧪 PRUEBA RÁPIDA DE CAPTURA")
+        """Prueba de captura usando las regiones calibradas"""
+        print("\n🧪 PRUEBA DE CALIBRACIÓN REAL")
         print("=" * 50)
         print("Controles:")
-        print("  ESPACIO: Capturar imagen")
+        print("  ESPACIO: Capturar regiones calibradas")
         print("  A: Captura automática continua")
         print("  S: Parar captura automática")
+        print("  1: Mostrar solo región ganadora")
+        print("  2: Mostrar solo región countdown")
+        print("  3: Mostrar ambas regiones")
         print("  Q/ESC: Salir")
+        
+        # Verificar calibración
+        if not self.calibration_data.get('winner_region'):
+            print("❌ No hay región ganadora calibrada")
+            return
+            
+        winner_region = self.calibration_data['winner_region']
+        countdown_region = self.calibration_data.get('countdown_region')
+        
+        print(f"🎯 Región ganadora: x={winner_region['x']}, y={winner_region['y']}, size={winner_region['width']}x{winner_region['height']}")
+        if countdown_region:
+            print(f"⏰ Región countdown: x={countdown_region['x']}, y={countdown_region['y']}, size={countdown_region['width']}x{countdown_region['height']}")
+        else:
+            print("⚠️ No hay región countdown calibrada")
         
         try:
             chrome_region = obtener_region_chrome()
@@ -416,78 +433,163 @@ class Calibrator:
             print(f"❌ Error detectando Chrome: {e}")
             return
         
-        # Región más grande en el centro para prueba
-        test_region = {
-            'left': chrome_region['left'] + chrome_region['width'] // 2 - 50,
-            'top': chrome_region['top'] + chrome_region['height'] // 2 - 35,
-            'width': 100,
-            'height': 70
-        }
-        
-        print(f"📍 Región de prueba: {test_region}")
-        
-        cv2.namedWindow('Test Captura', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('Test Calibración Real', cv2.WINDOW_NORMAL)
         if config.system == 'darwin':
-            cv2.moveWindow('Test Captura', 100, 100)
-            cv2.resizeWindow('Test Captura', 600, 400)
+            cv2.moveWindow('Test Calibración Real', 100, 100)
+            cv2.resizeWindow('Test Calibración Real', 800, 600)
         
         # Variables para captura automática
         auto_capture = False
         capture_count = 0
         last_capture_time = 0
+        display_mode = 3  # 1=winner, 2=countdown, 3=both
         
-        # Captura inicial para mostrar algo
-        print("📸 Captura inicial...")
-        try:
-            img = capture_screen(test_region)
-            if img is not None and img.size > 0:
-                big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
+        # Importar detector para OCR
+        from vision.detector import detect_number_from_image
+        
+        def create_display_image(images, detections, mode):
+            """Crear imagen para mostrar según el modo"""
+            if mode == 1 and images['winner'] is not None:
+                # Solo región ganadora
+                img = images['winner']
+                big_img = cv2.resize(img, (img.shape[1]*8, img.shape[0]*8), 
                                    interpolation=cv2.INTER_NEAREST)
-                cv2.imshow('Test Captura', big_img)
-                print(f"✅ Captura inicial exitosa: {img.shape}")
+                cv2.putText(big_img, f"WINNER: {detections['winner']}", (10, 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                return big_img
+                
+            elif mode == 2 and images['countdown'] is not None:
+                # Solo región countdown
+                img = images['countdown']
+                big_img = cv2.resize(img, (img.shape[1]*8, img.shape[0]*8), 
+                                   interpolation=cv2.INTER_NEAREST)
+                cv2.putText(big_img, f"COUNTDOWN: {detections['countdown']}", (10, 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                return big_img
+                
+            elif mode == 3:
+                # Ambas regiones
+                display_img = np.zeros((600, 800, 3), dtype=np.uint8)
+                
+                # Región ganadora arriba
+                if images['winner'] is not None:
+                    winner_img = cv2.resize(images['winner'], (400, 280), 
+                                          interpolation=cv2.INTER_NEAREST)
+                    display_img[10:290, 10:410] = winner_img
+                
+                cv2.putText(display_img, f"WINNER: {detections['winner']}", (10, 310), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                
+                # Región countdown abajo
+                if images['countdown'] is not None:
+                    countdown_img = cv2.resize(images['countdown'], (400, 280), 
+                                             interpolation=cv2.INTER_NEAREST)
+                    display_img[330:610, 10:410] = countdown_img
+                elif countdown_region:
+                    cv2.putText(display_img, "Error capturando countdown", (10, 450), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                
+                cv2.putText(display_img, f"COUNTDOWN: {detections['countdown']}", (10, 350), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+                
+                # Info adicional en el lado derecho
+                cv2.putText(display_img, f"Mode: {mode} (1=W, 2=C, 3=Both)", (420, 50), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(display_img, f"Auto: {'ON' if auto_capture else 'OFF'}", (420, 80), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(display_img, f"Count: {capture_count}", (420, 110), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                
+                # Coordenadas de regiones
+                cv2.putText(display_img, f"Winner pos: ({winner_region['x']},{winner_region['y']})", 
+                           (420, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                if countdown_region:
+                    cv2.putText(display_img, f"Countdown pos: ({countdown_region['x']},{countdown_region['y']})", 
+                               (420, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                
+                return display_img
+            
+            # Fallback - imagen negra con mensaje
+            fallback_img = np.zeros((400, 600, 3), dtype=np.uint8)
+            cv2.putText(fallback_img, "No hay imagen disponible", (50, 200), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            return fallback_img
+        
+        # Función para capturar y procesar regiones
+        def capture_and_process():
+            images = {}
+            detections = {}
+            
+            # Capturar región ganadora
+            try:
+                img_winner = capture_screen(winner_region)
+                if img_winner is not None and img_winner.size > 0:
+                    images['winner'] = img_winner
+                    number = detect_number_from_image(img_winner).strip()
+                    detections['winner'] = number if number else "N/A"
+                else:
+                    images['winner'] = None
+                    detections['winner'] = "ERROR"
+            except Exception as e:
+                images['winner'] = None
+                detections['winner'] = f"ERROR: {e}"
+            
+            # Capturar región countdown si existe
+            if countdown_region:
+                try:
+                    img_countdown = capture_screen(countdown_region)
+                    if img_countdown is not None and img_countdown.size > 0:
+                        images['countdown'] = img_countdown
+                        countdown = detect_number_from_image(img_countdown).strip()
+                        detections['countdown'] = countdown if countdown else "N/A"
+                    else:
+                        images['countdown'] = None
+                        detections['countdown'] = "ERROR"
+                except Exception as e:
+                    images['countdown'] = None
+                    detections['countdown'] = f"ERROR: {e}"
             else:
-                # Mostrar imagen en negro si falla
-                black_img = np.zeros((420, 600, 3), dtype=np.uint8)
-                cv2.putText(black_img, "No se pudo capturar", (50, 200), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.imshow('Test Captura', black_img)
-                print("❌ Captura inicial falló")
-        except Exception as e:
-            print(f"❌ Error en captura inicial: {e}")
+                images['countdown'] = None
+                detections['countdown'] = "NO CALIBRADO"
+            
+            return images, detections
+        
+        # Captura inicial
+        print("📸 Captura inicial de regiones calibradas...")
+        images, detections = capture_and_process()
+        
+        print(f"🎯 Número detectado: {detections['winner']}")
+        print(f"⏰ Countdown detectado: {detections['countdown']}")
+        
+        # Mostrar captura inicial
+        display_img = create_display_image(images, detections, display_mode)
+        cv2.imshow('Test Calibración Real', display_img)
         
         print("\n🎮 Ventana lista. Usa los controles para probar...")
-        
+
         while True:
             current_time = time.time()
             
             # Captura automática cada 500ms
             if auto_capture and (current_time - last_capture_time) > 0.5:
                 capture_count += 1
-                try:
-                    img = capture_screen(test_region)
-                    if img is not None and img.size > 0:
-                        big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
-                                           interpolation=cv2.INTER_NEAREST)
-                        
-                        # Añadir contador
-                        cv2.putText(big_img, f"Auto #{capture_count}", (10, 30), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(big_img, "Presiona 'S' para parar", (10, 60), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                        
-                        cv2.imshow('Test Captura', big_img)
-                        if capture_count % 10 == 0:
-                            print(f"📸 Auto-captura #{capture_count}")
-                    last_capture_time = current_time
-                except Exception as e:
-                    print(f"❌ Error en auto-captura: {e}")
+                images, detections = capture_and_process()
+                
+                # Mostrar detecciones en consola cada 10 capturas
+                if capture_count % 10 == 0:
+                    print(f"📸 Auto #{capture_count} - Winner: {detections['winner']}, Countdown: {detections['countdown']}")
+                
+                # Actualizar display
+                display_img = create_display_image(images, detections, display_mode)
+                cv2.imshow('Test Calibración Real', display_img)
+                last_capture_time = current_time
             
             # Manejo de teclas con timeout más corto para mejor responsividad
             key = cv2.waitKey(30) & 0xFF
             
             # Verificar si la ventana sigue abierta
             try:
-                if cv2.getWindowProperty('Test Captura', cv2.WND_PROP_VISIBLE) < 1:
+                if cv2.getWindowProperty('Test Calibración Real', cv2.WND_PROP_VISIBLE) < 1:
                     print("❌ Ventana cerrada")
                     break
             except:
@@ -495,19 +597,12 @@ class Calibrator:
             
             if key == ord(' '):
                 print("📸 Captura manual...")
-                try:
-                    img = capture_screen(test_region)
-                    if img is not None and img.size > 0:
-                        big_img = cv2.resize(img, (img.shape[1]*6, img.shape[0]*6), 
-                                           interpolation=cv2.INTER_NEAREST)
-                        cv2.putText(big_img, "Captura Manual", (10, 30), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                        cv2.imshow('Test Captura', big_img)
-                        print(f"✅ Captura manual exitosa: {img.shape}")
-                    else:
-                        print("❌ Captura manual falló - imagen vacía")
-                except Exception as e:
-                    print(f"❌ Error en captura manual: {e}")
+                images, detections = capture_and_process()
+                print(f"🎯 Winner: {detections['winner']}")
+                print(f"⏰ Countdown: {detections['countdown']}")
+                
+                display_img = create_display_image(images, detections, display_mode)
+                cv2.imshow('Test Calibración Real', display_img)
                     
             elif key == ord('a'):
                 auto_capture = True
@@ -517,6 +612,22 @@ class Calibrator:
             elif key == ord('s'):
                 auto_capture = False
                 print("⏹️  Captura automática DETENIDA")
+                
+            elif key == ord('1'):
+                display_mode = 1
+                print("👁️  Modo: Solo región ganadora")
+                
+            elif key == ord('2'):
+                display_mode = 2
+                if countdown_region:
+                    print("👁️  Modo: Solo región countdown")
+                else:
+                    print("❌ No hay región countdown calibrada")
+                    display_mode = 3
+                
+            elif key == ord('3'):
+                display_mode = 3
+                print("👁️  Modo: Ambas regiones")
                 
             elif key == ord('q') or key == 27:
                 print("👋 Saliendo...")

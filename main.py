@@ -264,6 +264,20 @@ def main():
     print(f"🖥️  Sistema: {config.system.upper()}")
     print("-" * 70)
     
+    # Optimizaciones específicas para Windows
+    if config.is_windows:
+        print("🔧 Aplicando optimizaciones para Windows...")
+        config.optimize_for_windows()
+    
+    # Obtener configuraciones de rendimiento
+    perf_settings = config.get_performance_settings()
+    print(f"⚡ Configuración de rendimiento cargada:")
+    print(f"   - Captura: cada {perf_settings['capture_interval']*1000:.0f}ms")
+    print(f"   - OpenCV threads: {perf_settings['opencv_threads']}")
+    print(f"   - Saltear frames: 1 de cada {perf_settings['skip_frames']}")
+    print(f"   - Prioridad alta: {'SÍ' if perf_settings['priority_boost'] else 'NO'}")
+    print("-" * 70)
+    
     # Cargar calibración
     calibrator = Calibrator()
     if not calibrator.calibration_data.get('winner_region'):
@@ -307,46 +321,72 @@ def main():
     pyautogui.FAILSAFE = True
     pyautogui.PAUSE = config.get_click_delay()
 
+    # Variables de optimización
+    skip_frames = perf_settings['skip_frames']
+    capture_interval = perf_settings['capture_interval']
+    preview_interval = perf_settings['preview_interval']
+    memory_cleanup = perf_settings['memory_cleanup']
+    
+    last_capture_time = 0
+    last_preview_time = 0
+    memory_cleanup_counter = 0
+
     try:
         while True:
-            # Optimización: Reducir frecuencia de captura para mejorar rendimiento
-            if contador_scans % 2 == 0:  # Capturar cada 2 frames en lugar de todos
+            current_time = time.time()
+            
+            # Control de frecuencia de captura basado en tiempo real
+            if (current_time - last_capture_time) >= capture_interval:
                 
-                # Capturar región del número ganador
-                screenshot = capture_screen(region_numero)
-                img_ganador = np.array(screenshot)
-                
-                numero_ganador = ""
-                countdown_actual = None
+                    # Optimización: Saltear frames según configuración
+                    if contador_scans % skip_frames == 0:
+                        
+                        # Capturar región del número ganador
+                        screenshot = capture_screen(region_numero)
+                        img_ganador = np.array(screenshot)
+                        
+                        numero_ganador = ""
+                        countdown_actual = None
 
-                if img_ganador is not None and img_ganador.size > 0:
-                    numero_ganador = detect_number_from_image(img_ganador).strip()
-                    if numero_ganador:
-                        detector.procesar_numero(numero_ganador)
+                        if img_ganador is not None and img_ganador.size > 0:
+                            numero_ganador = detect_number_from_image(img_ganador).strip()
+                            if numero_ganador:
+                                detector.procesar_numero(numero_ganador)
 
-                # Capturar countdown si está disponible (menos frecuente para optimizar)
-                if region_countdown and contador_scans % 3 == 0:  # Countdown cada 3 frames
-                    try:
-                        screenshot_countdown = capture_screen(region_countdown)
-                        img_countdown = np.array(screenshot_countdown)
-                        if img_countdown is not None and img_countdown.size > 0:
-                            countdown_str = detect_number_from_image(img_countdown).strip()
-                            if countdown_str:
-                                countdown_actual = detector.procesar_countdown(countdown_str)
-                    except Exception as e:
-                        if contador_scans % 2000 == 0:  # Reducir mensajes de error
-                            print(f"⚠️ Error capturando countdown: {e}")
+                        # Capturar countdown si está disponible (menos frecuente para optimizar)
+                        if region_countdown and contador_scans % (skip_frames * 2) == 0:  # Countdown menos frecuente
+                            try:
+                                screenshot_countdown = capture_screen(region_countdown)
+                                img_countdown = np.array(screenshot_countdown)
+                                if img_countdown is not None and img_countdown.size > 0:
+                                    countdown_str = detect_number_from_image(img_countdown).strip()
+                                    if countdown_str:
+                                        countdown_actual = detector.procesar_countdown(countdown_str)
+                            except Exception as e:
+                                if contador_scans % 5000 == 0:  # Reducir spam de errores
+                                    print(f"⚠️ Error capturando countdown: {e}")
+                    
+                    last_capture_time = current_time
 
             # Verificar momento de apuesta (siempre, para no perder oportunidades)
-            if region_countdown and countdown_actual is not None:
+            if 'countdown_actual' in locals() and countdown_actual is not None:
                 detector.verificar_momento_apuesta(countdown_actual)
             else:
                 detector.verificar_momento_apuesta()  # Sin countdown
             
+            # Limpieza de memoria en Windows
+            if memory_cleanup and contador_scans % 10000 == 0:
+                memory_cleanup_counter += 1
+                if memory_cleanup_counter % 5 == 0:  # Cada 50k scans
+                    import gc
+                    gc.collect()
+                    if config.is_windows:
+                        print(f"🧹 Memoria limpiada (scan #{contador_scans})")
+            
             contador_scans += 1
 
-            # Preview optimizado: mostrar menos frecuentemente
-            if contador_scans % 500 == 0 and 'img_ganador' in locals():  # Reducir frecuencia
+            # Preview optimizado basado en tiempo real
+            if (current_time - last_preview_time) >= preview_interval and 'img_ganador' in locals():
                 if img_ganador is not None:
                     # Convertir a BGR para cv2
                     img_bgr = cv2.cvtColor(img_ganador, cv2.COLOR_RGB2BGR)
@@ -387,6 +427,7 @@ def main():
                         cv2.putText(info_img, f"FPS: {fps_actual:.1f}", (200, 375), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
                     cv2.imshow("Simplified Bettor on 24", info_img)
+                    last_preview_time = current_time
 
             if contador_scans % 2500 == 0:
                 duracion = time.time() - detector.inicio_sesion
@@ -413,8 +454,11 @@ def main():
                 detector.debug_detecciones = not detector.debug_detecciones
                 print(f"🐛 Debug mode: {'ON' if detector.debug_detecciones else 'OFF'}")
             
-            # Pequeño delay para evitar saturar CPU
-            time.sleep(0.001)  # 1ms delay
+            # Delay adaptativo según SO
+            if config.is_windows:
+                time.sleep(0.001)  # 1ms para Windows (más rápido)
+            else:
+                time.sleep(0.005)  # 5ms para otros SO
 
     except KeyboardInterrupt:
         print(f"\n🛑 Session ended by the user")
