@@ -26,19 +26,29 @@ class Calibrator:
         
     def load_calibration(self):
         """Carga calibración existente o crea una nueva"""
+        print(f"📁 Buscando calibración en: {self.config_file}")
+        
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
                     data = json.load(f)
                     
-                    # Auto-escalar regiones si es Windows con resolución alta
-                    if config.is_windows and (config.resolution_info['is_2k'] or config.resolution_info['is_4k']):
-                        print(f"🔧 Auto-escalando calibración para {config.get_resolution_info()}")
-                        data = config.auto_scale_regions(data)
-                        
-                    return data
-            except:
-                pass
+                print(f"✅ Calibración cargada desde: {self.config_file}")
+                print(f"   Regiones encontradas: {list(data.keys())}")
+                
+                # Auto-escalar regiones si es Windows con resolución alta
+                if config.is_windows and (config.resolution_info['is_2k'] or config.resolution_info['is_4k']):
+                    print(f"🔧 Auto-escalando calibración para {config.get_resolution_info()}")
+                    data = config.auto_scale_regions(data)
+                    
+                return data
+            except json.JSONDecodeError as e:
+                print(f"❌ Error decodificando JSON: {e}")
+                print(f"   El archivo de calibración puede estar corrupto")
+            except Exception as e:
+                print(f"❌ Error cargando calibración: {e}")
+        else:
+            print(f"⚠️ No se encontró archivo de calibración")
         
         # Usar tamaños óptimos según resolución
         optimal_width, optimal_height = config.get_optimal_capture_size()
@@ -67,13 +77,20 @@ class Calibrator:
         """Valida que las coordenadas estén en rangos razonables"""
         issues = []
         
+        print("\n🔍 VALIDANDO REGIONES:")
+        
         # Validar regiones
         for region_name in ['winner_region', 'countdown_region', 'balance_region', 'total_bet_region']:
             region = self.calibration_data.get(region_name)
             if region and isinstance(region, dict):
                 x, y = region.get('x', 0), region.get('y', 0)
+                w, h = region.get('width', 0), region.get('height', 0)
+                print(f"   {region_name}: x={x}, y={y}, size={w}x{h}")
+                
                 if not (0 <= x <= 5000 and 0 <= y <= 3000):
                     issues.append(f"❌ {region_name}: coordenadas fuera de rango ({x}, {y})")
+            else:
+                print(f"   {region_name}: NO CONFIGURADA")
         
         # Validar posiciones de apuesta
         bet_positions = self.calibration_data.get('bet_positions', {})
@@ -1297,10 +1314,59 @@ class Calibrator:
             print(f"❌ Error durante normalización: {e}")
             import traceback
             traceback.print_exc()
+    
+    def reset_calibration(self):
+        """Limpia/resetea la calibración"""
+        print("\n🗑️  RESETEAR CALIBRACIÓN")
+        print("=" * 50)
+        print(f"Archivo actual: {self.config_file}")
+        
+        if self.config_file.exists():
+            print("\n⚠️  ADVERTENCIA: Esto eliminará toda la calibración guardada")
+            confirmar = input("¿Estás seguro? (escribe 'ELIMINAR' para confirmar): ").strip()
+            
+            if confirmar == 'ELIMINAR':
+                try:
+                    # Hacer backup primero
+                    import shutil
+                    from datetime import datetime
+                    backup_name = f"calibration_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    backup_path = self.config_file.parent / backup_name
+                    shutil.copy(self.config_file, backup_path)
+                    print(f"📋 Backup creado: {backup_path}")
+                    
+                    # Eliminar archivo
+                    os.remove(self.config_file)
+                    print(f"✅ Calibración eliminada")
+                    
+                    # Recargar datos vacíos
+                    self.calibration_data = self.load_calibration()
+                    print("✅ Calibración reseteada. Ejecuta una nueva calibración.")
+                except Exception as e:
+                    print(f"❌ Error al resetear: {e}")
+            else:
+                print("❌ Reseteo cancelado")
+        else:
+            print("⚠️ No hay calibración guardada para eliminar")
 
 def run_calibration():
     """Función principal de calibración"""
     calibrator = Calibrator()
+    
+    # Mostrar información sobre el archivo de calibración
+    print(f"\n📂 INFORMACIÓN DE CALIBRACIÓN:")
+    print(f"   Archivo: {calibrator.config_file}")
+    print(f"   Existe: {'SÍ' if calibrator.config_file.exists() else 'NO'}")
+    if calibrator.config_file.exists():
+        import os
+        file_size = os.path.getsize(calibrator.config_file)
+        print(f"   Tamaño: {file_size} bytes")
+        try:
+            with open(calibrator.config_file, 'r') as f:
+                data = json.load(f)
+                print(f"   Regiones guardadas: {list(data.keys())}")
+        except:
+            print(f"   ⚠️ Error leyendo el archivo")
     
     while True:
         print("\n🎯 HERRAMIENTA DE CALIBRACIÓN")
@@ -1313,9 +1379,10 @@ def run_calibration():
         print("6. 🚀 AUTO-DETECTOR de 37 números (0-36)")
         print("7. Prueba rápida de captura (debug)")
         print("8. 🔧 Normalizar ventana de Chrome")
-        print("9. Salir")
+        print("9. 🗑️  Limpiar/resetear calibración")
+        print("0. Salir")
         
-        choice = input("\nSelecciona una opción (1-9): ").strip()
+        choice = input("\nSelecciona una opción (0-9): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -1336,6 +1403,8 @@ def run_calibration():
         elif choice == '8':
             calibrator.normalize_chrome_only()
         elif choice == '9':
+            calibrator.reset_calibration()
+        elif choice == '0':
             print("👋 Hasta luego!")
             break
         else:

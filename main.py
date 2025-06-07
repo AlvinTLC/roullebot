@@ -318,10 +318,19 @@ def main():
     print("-" * 70)
     
     # Cargar calibración
+    print("\n📋 CARGANDO CALIBRACIÓN...")
+    print("-" * 50)
     calibrator = Calibrator()
+    
+    # Verificar que se cargó correctamente
+    if not calibrator.calibration_data:
+        print("❌ No se pudo cargar ninguna calibración")
+        return
+        
     if not calibrator.calibration_data.get('winner_region'):
-        print("❌ No hay calibración guardada.")
+        print("❌ No hay región ganadora calibrada")
         print("📋 Ejecuta primero: python roullebot.py --mode calibrate")
+        print(f"   Datos disponibles: {list(calibrator.calibration_data.keys())}")
         return
     
     # Validar calibración
