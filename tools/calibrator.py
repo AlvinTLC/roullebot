@@ -47,6 +47,10 @@ class Calibrator:
         return {
             'winner_region': None,
             'countdown_region': None,
+            'balance_region': None,
+            'total_bet_region': None,
+            'repeat_bet_region': None,
+            'chip_regions': {},  # Para diferentes valores de fichas
             'bet_positions': {},
             'chrome_offset': {'x': 0, 'y': 0},
             'optimal_capture_size': {'width': optimal_width, 'height': optimal_height},
@@ -78,9 +82,15 @@ class Calibrator:
         tasks = [
             "Click en el área donde aparece el NÚMERO GANADOR",
             "Click en el área donde aparece el COUNTDOWN",
+            "Click en el área donde aparece el BALANCE/SALDO",
+            "Click en el área donde aparece TOTAL BET",
+            "Click en el área del botón REPEAT BET",
             "Click en el NÚMERO 24 para apostar",
-            "Click en el NÚMERO 0 para apostar",
-            "Click en el NÚMERO 12 para apostar"
+            "Click en el NÚMERO 0 para apostar", 
+            "Click en el NÚMERO 12 para apostar",
+            "Click en FICHA $1 (valor más bajo)",
+            "Click en FICHA $5",
+            "Click en FICHA $25 (valor alto)"
         ]
         
         def mouse_callback(event, x, y, flags, param):
@@ -186,10 +196,40 @@ class Calibrator:
                     'width': countdown_width,
                     'height': countdown_height
                 }
+                # Regiones de información
+                self.calibration_data['balance_region'] = {
+                    'x': clicks[2]['abs_x'] - 80,
+                    'y': clicks[2]['abs_y'] - 25,
+                    'width': 160,
+                    'height': 50
+                }
+                self.calibration_data['total_bet_region'] = {
+                    'x': clicks[3]['abs_x'] - 80,
+                    'y': clicks[3]['abs_y'] - 25,
+                    'width': 160,
+                    'height': 50
+                }
+                self.calibration_data['repeat_bet_region'] = {
+                    'x': clicks[4]['abs_x'] - 40,
+                    'y': clicks[4]['abs_y'] - 20,
+                    'width': 80,
+                    'height': 40
+                }
+                
+                # Posiciones de apuesta
+                bet_start_idx = 5
                 self.calibration_data['bet_positions'] = {
-                    '24': {'x': clicks[2]['abs_x'], 'y': clicks[2]['abs_y']},
-                    '0': {'x': clicks[3]['abs_x'], 'y': clicks[3]['abs_y']} if len(clicks) > 3 else None,
-                    '12': {'x': clicks[4]['abs_x'], 'y': clicks[4]['abs_y']} if len(clicks) > 4 else None
+                    '24': {'x': clicks[bet_start_idx]['abs_x'], 'y': clicks[bet_start_idx]['abs_y']} if len(clicks) > bet_start_idx else None,
+                    '0': {'x': clicks[bet_start_idx + 1]['abs_x'], 'y': clicks[bet_start_idx + 1]['abs_y']} if len(clicks) > bet_start_idx + 1 else None,
+                    '12': {'x': clicks[bet_start_idx + 2]['abs_x'], 'y': clicks[bet_start_idx + 2]['abs_y']} if len(clicks) > bet_start_idx + 2 else None
+                }
+                
+                # Posiciones de fichas
+                chip_start_idx = 8
+                self.calibration_data['chip_regions'] = {
+                    '1': {'x': clicks[chip_start_idx]['abs_x'], 'y': clicks[chip_start_idx]['abs_y']} if len(clicks) > chip_start_idx else None,
+                    '5': {'x': clicks[chip_start_idx + 1]['abs_x'], 'y': clicks[chip_start_idx + 1]['abs_y']} if len(clicks) > chip_start_idx + 1 else None,
+                    '25': {'x': clicks[chip_start_idx + 2]['abs_x'], 'y': clicks[chip_start_idx + 2]['abs_y']} if len(clicks) > chip_start_idx + 2 else None
                 }
                 self.calibration_data['chrome_offset'] = {
                     'x': chrome_region['left'],
@@ -275,14 +315,13 @@ class Calibrator:
         print("=" * 50)
         print("Controles:")
         print("  'q': Salir")
-        print("  '1': Región grande (100x70) - Para grilla de números")
-        print("  '2': Región mediana (80x60)")
-        print("  '3': Región pequeña (60x40) - Original")
-        print("  '4': Región extra pequeña (40x30)")
+        print("  '1-4': Cambiar tamaño región")
+        print("  'TAB': Cambiar región activa (Winner/Countdown/Balance/etc.)")
         print("  'd': Activar/desactivar debug OCR")
-        print("  'FLECHAS': Mover región winner (←↑→↓)")
-        print("  'WAFS': Mover región winner (alternativo)")
-        print("  'g': Guardar posición actual")
+        print("  'FLECHAS': Mover región activa (←↑→↓)")
+        print("  'WAFS': Mover región activa (alternativo)")
+        print("  'g': Guardar todas las posiciones")
+        print("  'r': Reset región activa a original")
         
         # Configurar ventanas específicas para macOS
         main_window = 'Test Calibración - Live Preview'
@@ -312,16 +351,44 @@ class Calibrator:
         move_step = 5  # Pixeles por movimiento
         region_modified = False
         
+        # Sistema multi-región
+        regions_info = [
+            {'key': 'winner_region', 'name': 'WINNER', 'color': (0, 255, 0)},
+            {'key': 'countdown_region', 'name': 'COUNTDOWN', 'color': (255, 255, 0)},
+            {'key': 'balance_region', 'name': 'BALANCE', 'color': (255, 0, 255)},
+            {'key': 'total_bet_region', 'name': 'TOTAL BET', 'color': (0, 255, 255)},
+            {'key': 'repeat_bet_region', 'name': 'REPEAT', 'color': (255, 128, 0)}
+        ]
+        current_region_idx = 0  # Empezar con winner_region
+        
+        # Hacer copias para poder modificar
+        regions_backup = {}
+        for info in regions_info:
+            key = info['key']
+            if self.calibration_data.get(key):
+                regions_backup[key] = self.calibration_data[key].copy()
+        
         from vision.detector import detect_number_from_image, detect_number_debug
         
         while True:
-            # Capturar regiones calibradas (usar copia para poder modificar)
-            winner_region = self.calibration_data['winner_region'].copy()
+            # Obtener región activa
+            current_region_info = regions_info[current_region_idx]
+            current_region_key = current_region_info['key']
+            current_region_name = current_region_info['name']
+            current_region_color = current_region_info['color']
+            
+            # Verificar que la región existe
+            if not self.calibration_data.get(current_region_key):
+                print(f"⚠️ Región {current_region_name} no calibrada, saltando a la siguiente...")
+                current_region_idx = (current_region_idx + 1) % len(regions_info)
+                continue
+                
+            current_region = self.calibration_data[current_region_key].copy()
             size = region_sizes[current_size]
             
             # Ajustar región para centrarla mejor
-            center_x = winner_region['x'] + winner_region['width'] // 2
-            center_y = winner_region['y'] + winner_region['height'] // 2
+            center_x = current_region['x'] + current_region['width'] // 2
+            center_y = current_region['y'] + current_region['height'] // 2
             
             adjusted_region = {
                 'left': center_x - size['w'] // 2,
@@ -378,27 +445,38 @@ class Calibrator:
                     
                     # Añadir texto informativo
                     y_text = display_img.shape[0] + 25
-                    cv2.putText(combined, f"Numero detectado: {numero if numero else 'N/A'}", 
-                               (10, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
+                    # Detectar contenido según el tipo de región
+                    detection_text = "N/A"
+                    if numero:
+                        detection_text = numero
+                    
+                    # Información de región activa (destacada)
+                    cv2.putText(combined, f"REGION ACTIVA: {current_region_name}", 
+                               (10, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.8, current_region_color, 2)
+                    
+                    cv2.putText(combined, f"Detectado: {detection_text}", 
+                               (10, y_text + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
                                (0, 255, 0) if numero else (0, 0, 255), 2)
                     
-                    cv2.putText(combined, f"Region: {size['name']} ({size['w']}x{size['h']})", 
-                               (10, y_text + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                    
-                    cv2.putText(combined, f"Pos: x={adjusted_region['left']}, y={adjusted_region['top']}", 
+                    cv2.putText(combined, f"Tamaño: {size['name']} ({size['w']}x{size['h']})", 
                                (10, y_text + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                     
-                    cv2.putText(combined, f"Debug: {'ON' if debug_mode else 'OFF'} | 1-4: Tamaño | D: Debug | Q: Salir", 
-                               (10, y_text + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                    cv2.putText(combined, f"Pos: x={adjusted_region['left']}, y={adjusted_region['top']}", 
+                               (10, y_text + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                     
-                    # Mostrar controles de movimiento
-                    cv2.putText(combined, f"Mover: FLECHAS o WAFS | G: Guardar", 
-                               (10, y_text + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 255, 100), 1)
+                    # Controles y estado
+                    cv2.putText(combined, f"TAB: Cambiar región | FLECHAS: Mover | G: Guardar | R: Reset", 
+                               (10, y_text + 105), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 255, 100), 1)
                     
                     # Indicador de modificación
                     if region_modified:
                         cv2.putText(combined, "REGION MODIFICADA - Presiona G para guardar", 
-                                   (10, y_text + 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                                   (10, y_text + 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                    
+                    # Lista de regiones disponibles
+                    regions_text = " | ".join([f"{i+1}.{info['name']}" for i, info in enumerate(regions_info)])
+                    cv2.putText(combined, f"Regiones: {regions_text}", 
+                               (10, y_text + 145), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
                     
                     cv2.imshow(main_window, combined)
                     
@@ -444,26 +522,39 @@ class Calibrator:
                 debug_mode = not debug_mode
                 print(f"✅ Debug mode: {'ON' if debug_mode else 'OFF'}")
             elif key == ord('g'):
-                # Guardar posición actual
+                # Guardar todas las posiciones
                 self.save_calibration()
-                print(f"💾 Calibración guardada! Posición: x={winner_region['x']}, y={winner_region['y']}")
+                region_modified = False
+                print(f"💾 Todas las regiones guardadas!")
+            elif key == 9:  # TAB
+                # Cambiar región activa
+                current_region_idx = (current_region_idx + 1) % len(regions_info)
+                next_region = regions_info[current_region_idx]
+                print(f"🔄 Cambiado a región: {next_region['name']}")
+                region_modified = False
+            elif key == ord('r'):
+                # Reset región activa a original
+                if current_region_key in regions_backup:
+                    self.calibration_data[current_region_key] = regions_backup[current_region_key].copy()
+                    print(f"🔄 Región {current_region_name} restaurada a original")
+                    region_modified = False
             # Teclas de flecha (códigos especiales para OpenCV en macOS)
             elif key == 63234 or key == ord('a'):  # Flecha izquierda o 'a' (macOS)
-                self.calibration_data['winner_region']['x'] -= move_step
+                self.calibration_data[current_region_key]['x'] -= move_step
                 region_modified = True
-                print(f"⬅️ Movido izquierda: x={self.calibration_data['winner_region']['x']}")
+                print(f"⬅️ {current_region_name} movido izquierda: x={self.calibration_data[current_region_key]['x']}")
             elif key == 63235 or key == ord('f'):  # Flecha derecha o 'f' (macOS)
-                self.calibration_data['winner_region']['x'] += move_step
+                self.calibration_data[current_region_key]['x'] += move_step
                 region_modified = True
-                print(f"➡️ Movido derecha: x={self.calibration_data['winner_region']['x']}")
+                print(f"➡️ {current_region_name} movido derecha: x={self.calibration_data[current_region_key]['x']}")
             elif key == 63232 or key == ord('w'):  # Flecha arriba o 'w' (macOS)
-                self.calibration_data['winner_region']['y'] -= move_step
+                self.calibration_data[current_region_key]['y'] -= move_step
                 region_modified = True
-                print(f"⬆️ Movido arriba: y={self.calibration_data['winner_region']['y']}")
+                print(f"⬆️ {current_region_name} movido arriba: y={self.calibration_data[current_region_key]['y']}")
             elif key == 63233 or key == ord('s'):  # Flecha abajo o 's' (macOS)
-                self.calibration_data['winner_region']['y'] += move_step
+                self.calibration_data[current_region_key]['y'] += move_step
                 region_modified = True
-                print(f"⬇️ Movido abajo: y={self.calibration_data['winner_region']['y']}")
+                print(f"⬇️ {current_region_name} movido abajo: y={self.calibration_data[current_region_key]['y']}")
             elif key != 255:  # Cualquier otra tecla (para debug)
                 print(f"🔍 Tecla presionada: {key} (char: {chr(key) if 32 <= key <= 126 else 'special'})")
         
