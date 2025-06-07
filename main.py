@@ -193,10 +193,10 @@ class DetectorGanadoresSimple:
             
         apuesta_realizada = False
         
-        # MODO MEJORADO: Priorizar countdown, luego fallback
+        # MODO MEJORADO: Apostar en countdown 8 o 9
         if countdown is not None and countdown > 0:
-            # Apostar en countdown específicos con mayor agresividad
-            if countdown in [12, 10, 8, 6]:  # Más oportunidades + temprano
+            # Apostar específicamente en countdown 8 o 9
+            if countdown in [9, 8]:  # Solo en 8 o 9
                 print(f"🎯 [{timestamp}] BETTING NOW! (Countdown = {countdown})")
                 apuesta_realizada = True
                 # Marcar inmediatamente para evitar apuestas múltiples
@@ -375,7 +375,7 @@ def main():
         print(f"💰 SISTEMA AUTOMÁTICO:")
         print(f"   1️⃣ Detectar número ganador")
         print(f"   2️⃣ Monitorear countdown")
-        print(f"   3️⃣ Apostar cuando countdown = 12,10,8,6")
+        print(f"   3️⃣ Apostar cuando countdown = 8 o 9")
     else:
         print("⚠️ No hay región de countdown calibrada. Usando modo de espera de 2.5 segundos.")
         print(f"💰 SISTEMA SIMPLIFICADO:")
@@ -487,9 +487,23 @@ def main():
                     cv2.putText(display_img, f"WINNER: {current_winner or 'N/A'}", (15, 310), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, winner_color, 2)
                     
-                    # Countdown (prominente)
-                    countdown_color = (0, 255, 255) if current_countdown and int(current_countdown) <= 15 else (255, 255, 0)
-                    cv2.putText(display_img, f"COUNTDOWN: {current_countdown or 'N/A'}", (15, 340), 
+                    # Countdown (prominente con estado de apuesta)
+                    if current_countdown and current_countdown.isdigit():
+                        countdown_num = int(current_countdown)
+                        if countdown_num in [9, 8]:
+                            countdown_color = (0, 255, 0)  # Verde - momento de apostar
+                            countdown_text = f"COUNTDOWN: {current_countdown} ⚡ BETTING TIME!"
+                        elif countdown_num <= 15:
+                            countdown_color = (0, 255, 255)  # Cian - preparándose
+                            countdown_text = f"COUNTDOWN: {current_countdown} 🔄 Waiting..."
+                        else:
+                            countdown_color = (255, 255, 0)  # Amarillo - normal
+                            countdown_text = f"COUNTDOWN: {current_countdown}"
+                    else:
+                        countdown_color = (255, 255, 0)
+                        countdown_text = f"COUNTDOWN: {current_countdown or 'N/A'}"
+                    
+                    cv2.putText(display_img, countdown_text, (15, 340), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, countdown_color, 2)
                     
                     # Target actual
@@ -509,12 +523,20 @@ def main():
                     # Estado de apuestas (centro inferior)
                     if region_countdown:
                         if detector.puede_apostar:
-                            if current_countdown and int(current_countdown) <= 15:
-                                color = (0, 255, 255) if int(current_countdown) > 10 else (0, 255, 0)
-                                status_text = f"READY TO BET (countdown: {current_countdown})"
+                            if current_countdown and current_countdown.isdigit():
+                                countdown_num = int(current_countdown)
+                                if countdown_num in [9, 8]:
+                                    color = (0, 255, 0)
+                                    status_text = f"⚡ BETTING NOW! (countdown: {current_countdown})"
+                                elif countdown_num <= 15:
+                                    color = (0, 255, 255)
+                                    status_text = f"🔄 Ready to bet at 8-9 (countdown: {current_countdown})"
+                                else:
+                                    color = (200, 200, 200)
+                                    status_text = f"⏳ Waiting for countdown 8-9 (current: {current_countdown})"
                             else:
                                 color = (200, 200, 200)
-                                status_text = "Waiting for countdown..."
+                                status_text = "Waiting for countdown detection..."
                         else:
                             color = (100, 100, 255)
                             status_text = "Bet placed, waiting for next winner"

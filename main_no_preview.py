@@ -172,11 +172,13 @@ class DetectorGanadoresRapido:
         apuesta_realizada = False
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         
-        # MODO SUPER AGRESIVO: Más oportunidades de apuesta
+        # MODO OPTIMIZADO: Apostar en countdown 8 o 9
         if countdown is not None:
-            if countdown in [10, 8, 6, 4, 2]:  # Más puntos de apuesta
+            if countdown in [9, 8]:  # Solo en 8 o 9 para mejor timing
                 print(f"🎯 [{timestamp}] BETTING NOW! (Countdown = {countdown})")
                 apuesta_realizada = True
+                # Marcar inmediatamente para evitar apuestas múltiples
+                self.puede_apostar = False
         else:
             # Modo fallback más rápido
             if self.esperando_apuesta and self.tiempo_espera_inicio:
@@ -305,7 +307,7 @@ def main_fast():
         print(f"⚠️  No bet positions - using defaults")
     
     if region_countdown:
-        print(f"💰 ULTRA FAST SYSTEM: Bet at countdown 12,10,8,6")
+        print(f"💰 ULTRA FAST SYSTEM: Bet at countdown 8 or 9")
     else:
         print("⚠️ No countdown - using 2.5s delay mode")
         print(f"💰 ULTRA FAST SYSTEM: Bet 2.5s after winner")
