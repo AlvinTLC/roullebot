@@ -46,11 +46,22 @@ def apostar_al_numero(numero='24', calibration_data=None):
         # Mostrar dónde vamos a hacer click
         print(f"🖱️  Haciendo click en: ({x}, {y})")
         
-        # Opcional: mover mouse primero para debug visual
-        pyautogui.moveTo(x, y)
-        time.sleep(0.1)  # Breve pausa para ver el movimiento
+        # Desactivar fail-safe temporalmente para apuestas
+        original_failsafe = pyautogui.FAILSAFE
+        pyautogui.FAILSAFE = False
         
-        pyautogui.click(x, y)
+        try:
+            # Opcional: mover mouse primero para debug visual (con validación)
+            if 0 <= x <= 3000 and 0 <= y <= 2000:  # Validar coordenadas razonables
+                pyautogui.moveTo(x, y)
+                time.sleep(0.1)  # Breve pausa para ver el movimiento
+                pyautogui.click(x, y)
+            else:
+                print(f"⚠️ Coordenadas fuera de rango: ({x}, {y})")
+                return False
+        finally:
+            # Restaurar fail-safe
+            pyautogui.FAILSAFE = original_failsafe
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         print(f"💰 [{timestamp}] ✅ BET PLACED on number {numero} at ({x}, {y})")
         return True
@@ -313,6 +324,14 @@ def main():
         print("📋 Ejecuta primero: python roullebot.py --mode calibrate")
         return
     
+    # Validar calibración
+    print("🔍 Validando calibración...")
+    if not calibrator.validate_calibration():
+        print("⚠️ Hay problemas con la calibración. Considera recalibrar.")
+        respuesta = input("¿Continuar de todas formas? (s/n): ").strip().lower()
+        if respuesta != 's':
+            return
+    
     try:
         region_chrome = obtener_region_chrome()
         print(f"✅ Chrome detectado en: {region_chrome}")
@@ -371,7 +390,9 @@ def main():
     detector = DetectorGanadoresSimple(calibrator.calibration_data)
     contador_scans = 0
 
-    pyautogui.FAILSAFE = True
+    # Configuración segura de PyAutoGUI
+    pyautogui.FAILSAFE = False  # Desactivamos para evitar errores con esquinas
+    pyautogui.PAUSE = 0.1       # Pausa entre comandos
     pyautogui.PAUSE = config.get_click_delay()
 
     # Variables de optimización

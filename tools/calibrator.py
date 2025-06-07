@@ -63,6 +63,35 @@ class Calibrator:
             json.dump(self.calibration_data, f, indent=2)
         print(f"✅ Calibración guardada en: {self.config_file}")
     
+    def validate_calibration(self):
+        """Valida que las coordenadas estén en rangos razonables"""
+        issues = []
+        
+        # Validar regiones
+        for region_name in ['winner_region', 'countdown_region', 'balance_region', 'total_bet_region']:
+            region = self.calibration_data.get(region_name)
+            if region and isinstance(region, dict):
+                x, y = region.get('x', 0), region.get('y', 0)
+                if not (0 <= x <= 3000 and 0 <= y <= 2000):
+                    issues.append(f"❌ {region_name}: coordenadas fuera de rango ({x}, {y})")
+        
+        # Validar posiciones de apuesta
+        bet_positions = self.calibration_data.get('bet_positions', {})
+        for numero, pos in bet_positions.items():
+            if pos and isinstance(pos, dict):
+                x, y = pos.get('x', 0), pos.get('y', 0)
+                if not (0 <= x <= 3000 and 0 <= y <= 2000):
+                    issues.append(f"❌ Bet position #{numero}: coordenadas fuera de rango ({x}, {y})")
+        
+        if issues:
+            print("⚠️ PROBLEMAS EN CALIBRACIÓN:")
+            for issue in issues:
+                print(f"   {issue}")
+            return False
+        else:
+            print("✅ Calibración validada correctamente")
+            return True
+    
     def calibrate_visual_click(self):
         """Calibración visual por click (más intuitiva)"""
         print("\n🎯 CALIBRACIÓN VISUAL POR CLICK")
@@ -219,10 +248,18 @@ class Calibrator:
                 for i, click in enumerate(clicks):
                     mouse_x, mouse_y = click['abs_x'], click['abs_y']
                     print(f"   {i+1}. {click['task']}: ({mouse_x}, {mouse_y})")
-                    # Mover mouse a esa posición para verificar
-                    pyautogui.moveTo(mouse_x, mouse_y)
-                    import time
-                    time.sleep(0.5)
+                    # Mover mouse a esa posición para verificar (con fail-safe off)
+                    original_failsafe = pyautogui.FAILSAFE
+                    pyautogui.FAILSAFE = False
+                    try:
+                        if 0 <= mouse_x <= 3000 and 0 <= mouse_y <= 2000:
+                            pyautogui.moveTo(mouse_x, mouse_y)
+                            import time
+                            time.sleep(0.5)
+                        else:
+                            print(f"   ⚠️ Coordenadas fuera de rango: ({mouse_x}, {mouse_y})")
+                    finally:
+                        pyautogui.FAILSAFE = original_failsafe
                 print("✅ Revisa si el mouse se posicionó correctamente en cada punto")
                 
             elif key == ord('s') and len(clicks) >= 3:
@@ -904,12 +941,23 @@ class Calibrator:
         print("=" * 50)
         print("El mouse se moverá a cada posición calibrada...")
         
-        bet_positions = self.calibration_data['bet_positions']
-        for numero, pos in bet_positions.items():
-            if pos and 'x' in pos and 'y' in pos:
-                print(f"📍 Moviendo a número {numero}: ({pos['x']}, {pos['y']})")
-                pyautogui.moveTo(pos['x'], pos['y'])
-                time.sleep(1.5)
+        # Desactivar fail-safe para el test
+        original_failsafe = pyautogui.FAILSAFE
+        pyautogui.FAILSAFE = False
+        
+        try:
+            bet_positions = self.calibration_data['bet_positions']
+            for numero, pos in bet_positions.items():
+                if pos and 'x' in pos and 'y' in pos:
+                    x, y = pos['x'], pos['y']
+                    if 0 <= x <= 3000 and 0 <= y <= 2000:
+                        print(f"📍 Moviendo a número {numero}: ({x}, {y})")
+                        pyautogui.moveTo(x, y)
+                        time.sleep(1.5)
+                    else:
+                        print(f"⚠️ Número {numero} tiene coordenadas fuera de rango: ({x}, {y})")
+        finally:
+            pyautogui.FAILSAFE = original_failsafe
                 
         print("✅ Test completado. ¿Las posiciones eran correctas?")
 

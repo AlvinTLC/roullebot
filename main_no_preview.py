@@ -43,10 +43,21 @@ def apostar_al_numero(numero='24', calibration_data=None):
             print(f"⚠️  No calibration data, using defaults")
             x, y = 1645, 1415
         
-        pyautogui.click(x, y)
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"💰 [{timestamp}] ✅ BET PLACED #{numero} at ({x}, {y})")
-        return True
+        # Desactivar fail-safe temporalmente
+        original_failsafe = pyautogui.FAILSAFE
+        pyautogui.FAILSAFE = False
+        
+        try:
+            if 0 <= x <= 3000 and 0 <= y <= 2000:  # Validar coordenadas
+                pyautogui.click(x, y)
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"💰 [{timestamp}] ✅ BET PLACED #{numero} at ({x}, {y})")
+                return True
+            else:
+                print(f"⚠️ Invalid coordinates: ({x}, {y})")
+                return False
+        finally:
+            pyautogui.FAILSAFE = original_failsafe
     except Exception as e:
         print(f"❌ Error placing bet: {e}")
         return False
@@ -307,8 +318,9 @@ def main_fast():
     detector = DetectorGanadoresRapido(calibrator.calibration_data)
     contador_scans = 0
 
-    pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.01  # Mínimo delay
+    # Configuración segura de PyAutoGUI para modo fast
+    pyautogui.FAILSAFE = False  # Desactivado para máximo rendimiento
+    pyautogui.PAUSE = 0.01      # Mínimo delay
 
     # Variables de optimización máxima
     skip_frames = perf_settings['skip_frames']
