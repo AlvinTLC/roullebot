@@ -90,6 +90,7 @@ Opciones de calibración:
 6. **🚀 AUTO-DETECTOR de 37 números**: Detecta automáticamente todos los números
 7. **Prueba rápida de captura**: Debug de captura de regiones
 8. **🔧 Normalizar ventana de Chrome**: Ajusta tamaño y posición consistente
+9. **🔍 Diagnosticar posición de Chrome**: Detecta problemas de coordenadas
 
 ### Ejecutar el Bot
 

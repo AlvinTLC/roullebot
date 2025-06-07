@@ -115,7 +115,7 @@ class DetectorGanadoresSimple:
         # Debug: mostrar detección solo si cambió
         if numero != self.ultimo_numero_detectado:
             if self.debug_detecciones:
-                print(f"🔍 Número detectado: {numero}")
+                print(f"🔍 Winner detectado (región WINNER): {numero}")
             self.ultimo_numero_detectado = str(numero) if numero is not None else ""
             self.contador_detecciones_validas += 1
 
@@ -163,10 +163,16 @@ class DetectorGanadoresSimple:
         
         countdown = int(countdown_str)
         
+        # VALIDAR: countdown debe estar en rango típico de 0-30
+        if countdown < 0 or countdown > 30:
+            if self.debug_detecciones:
+                print(f"⚠️ Countdown fuera de rango válido: {countdown} (ignorando)")
+            return False
+        
         # Debug: mostrar countdown solo si cambió
         if countdown_str != self.ultimo_countdown_detectado:
             if self.debug_detecciones and countdown <= 20:
-                print(f"⏰ Countdown detectado: {countdown}")
+                print(f"⏰ Countdown detectado (región COUNTDOWN): {countdown}")
             self.ultimo_countdown_detectado = str(countdown_str) if countdown_str is not None else ""
         
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -174,7 +180,7 @@ class DetectorGanadoresSimple:
         # Solo mostrar cambios significativos del countdown
         if self.ultimo_countdown != countdown:
             if countdown <= 15:  # Solo mostrar cuando se acerque el momento de apostar
-                print(f"⏰ [{timestamp}] Countdown: {countdown}")
+                print(f"⏰ [{timestamp}] Countdown (validated): {countdown}")
             self.ultimo_countdown = countdown
         
         return countdown
@@ -431,7 +437,7 @@ def main():
                     # Optimización: Saltear frames según configuración
                     if contador_scans % skip_frames == 0:
                         
-                        # Capturar región del número ganador
+                        # Capturar región del número ganador (WINNER REGION)
                         screenshot = capture_screen(region_numero)
                         img_ganador = np.array(screenshot)
                         
@@ -443,8 +449,8 @@ def main():
                             if numero_ganador:
                                 detector.procesar_numero(numero_ganador)
 
-                        # Capturar countdown si está disponible (menos frecuente para optimizar)
-                        if region_countdown and contador_scans % (skip_frames * 2) == 0:  # Countdown menos frecuente
+                        # Capturar countdown a la MISMA frecuencia para sincronizar preview
+                        if region_countdown:  # Sin reducir frecuencia para mejor sync
                             try:
                                 screenshot_countdown = capture_screen(region_countdown)
                                 img_countdown = np.array(screenshot_countdown)
@@ -475,10 +481,10 @@ def main():
             
             contador_scans += 1
 
-            # Preview mejorado centrado en región ganadora
+            # Preview mejorado - MUESTRA LA REGIÓN WINNER CALIBRADA
             if (current_time - last_preview_time) >= preview_interval and 'img_ganador' in locals():
                 if img_ganador is not None:
-                    # Convertir a BGR para cv2
+                    # Convertir a BGR para cv2 - img_ganador viene de region_numero (WINNER REGION)
                     img_bgr = cv2.cvtColor(img_ganador, cv2.COLOR_RGB2BGR)
                     
                     # Preview más grande y centrado
@@ -577,7 +583,7 @@ def main():
                     cv2.putText(display_img, status_text, (15, 400), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-                    # FPS en esquina inferior derecha
+                    # FPS y región info en esquina inferior derecha
                     if contador_scans > 100:
                         duracion_actual = time.time() - detector.inicio_sesion
                         fps_actual = contador_scans / duracion_actual
@@ -587,8 +593,12 @@ def main():
                     # Último ganador si existe
                     if len(detector.historial_ganadores) > 0:
                         ultimo_ganador = detector.historial_ganadores[-1][1]
-                        cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 370), 
+                        cv2.putText(display_img, f"Last: {ultimo_ganador}", (220, 385), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    
+                    # Mostrar qué región está viendo el preview
+                    cv2.putText(display_img, f"Region: Winner ({region_numero['width']}x{region_numero['height']})", (220, 415), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 200, 100), 1)
                     
                     # Calcular FPS real del preview
                     preview_fps_counter += 1

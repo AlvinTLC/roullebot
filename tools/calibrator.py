@@ -115,7 +115,8 @@ class Calibrator:
         print("=" * 50)
         print("1. Se abrirá una ventana mostrando Chrome")
         print("2. Haz click en las áreas que se te indiquen")
-        print("3. Presiona 't' para probar coordenadas, 's' para guardar, 'q' para salir")
+        print("3. Después de cada click, el mouse se moverá para verificar la posición")
+        print("4. Presiona 'u' para deshacer último click, 't' para test, 's' para guardar, 'q' para salir")
         
         try:
             # Normalizar Chrome durante calibración para consistencia
@@ -123,6 +124,15 @@ class Calibrator:
             print(f"\n🔍 CHROME REGION NORMALIZADA:")
             print(f"   left={chrome_region['left']}, top={chrome_region['top']}")
             print(f"   width={chrome_region['width']}, height={chrome_region['height']}")
+            
+            # VERIFICAR que Chrome esté en posición esperada
+            if chrome_region['left'] < 0 or chrome_region['top'] < 0:
+                print("⚠️ ADVERTENCIA: Chrome tiene coordenadas negativas!")
+                print(f"   Esto puede causar problemas de calibración.")
+                continuar = input("¿Continuar de todos modos? (s/n): ").strip().lower()
+                if continuar != 's':
+                    return
+                    
         except Exception as e:
             print(f"❌ Error: {e}")
             return
@@ -146,9 +156,6 @@ class Calibrator:
         def mouse_callback(event, x, y, flags, param):
             nonlocal current_task
             if event == cv2.EVENT_LBUTTONDOWN:
-                # IMPORTANTE: Las coordenadas x,y ya son absolutas de la pantalla
-                # porque estamos capturando la región completa de Chrome
-                
                 # Las coordenadas del click son relativas a la ventana CV
                 # Necesitamos convertirlas a coordenadas absolutas de pantalla
                 abs_x = chrome_region['left'] + x
@@ -159,6 +166,20 @@ class Calibrator:
                 print(f"   Coordenadas en ventana CV: ({x}, {y})")
                 print(f"   Chrome región: left={chrome_region['left']}, top={chrome_region['top']}")
                 print(f"   Coordenadas absolutas calculadas: ({abs_x}, {abs_y})")
+                
+                # VERIFICACIÓN INMEDIATA: Mover mouse para confirmar posición
+                print(f"🔍 Verificando posición inmediatamente...")
+                original_failsafe = pyautogui.FAILSAFE
+                pyautogui.FAILSAFE = False
+                try:
+                    if 0 <= abs_x <= 5000 and 0 <= abs_y <= 3000:
+                        pyautogui.moveTo(abs_x, abs_y)
+                        time.sleep(0.3)  # Pausa para ver el movimiento
+                        print(f"   ✅ Mouse movido a ({abs_x}, {abs_y}) - ¿Está en la posición correcta?")
+                    else:
+                        print(f"   ⚠️ Coordenadas fuera de rango válido: ({abs_x}, {abs_y})")
+                finally:
+                    pyautogui.FAILSAFE = original_failsafe
                 
                 clicks.append({
                     'task': tasks[current_task],
@@ -260,6 +281,15 @@ class Calibrator:
             if key == ord('q'):
                 print("❌ Calibración cancelada")
                 break
+            elif key == ord('u'):
+                # Deshacer último click
+                if clicks:
+                    ultimo_click = clicks.pop()
+                    current_task = max(0, current_task - 1)
+                    print(f"↩️  Deshecho último click: {ultimo_click['task']}")
+                    print(f"📋 Ahora: {tasks[current_task] if current_task < len(tasks) else 'Completado'}")
+                else:
+                    print("⚠️ No hay clicks para deshacer")
             elif key == ord('t'):
                 # Test: mostrar dónde haríamos click con las coordenadas actuales
                 print("\n🧪 TEST DE COORDENADAS:")
@@ -1333,6 +1363,63 @@ class Calibrator:
             import traceback
             traceback.print_exc()
     
+    def diagnose_chrome_position(self):
+        \"\"\"Diagnóstica problemas con la posición de Chrome\"\"\"
+        print(\"\\n🔍 DIAGNÓSTICO DE POSICIÓN DE CHROME\")
+        print(\"=\" * 50)
+        
+        try:
+            # Obtener información actual de Chrome
+            from utils.window_manager import window_manager
+            chrome_window = window_manager.find_chrome_window()
+            
+            if not chrome_window:
+                print(\"❌ No se encuentra ventana de Chrome abierta\")
+                return
+                
+            print(f\"📊 CHROME ACTUAL:\")
+            print(f\"   Posición: ({chrome_window['x']}, {chrome_window['y']})\")
+            print(f\"   Tamaño: {chrome_window['width']}x{chrome_window['height']}\")
+            
+            # Probar detección sin normalizar
+            chrome_region_raw = obtener_region_chrome(normalize=False)
+            print(f\"\\n📊 REGIÓN SIN NORMALIZAR:\")
+            print(f\"   left={chrome_region_raw['left']}, top={chrome_region_raw['top']}\")
+            print(f\"   width={chrome_region_raw['width']}, height={chrome_region_raw['height']}\")
+            
+            # Probar detección con normalización
+            chrome_region_norm = obtener_region_chrome(normalize=True)
+            print(f\"\\n📊 REGIÓN NORMALIZADA:\")
+            print(f\"   left={chrome_region_norm['left']}, top={chrome_region_norm['top']}\")
+            print(f\"   width={chrome_region_norm['width']}, height={chrome_region_norm['height']}\")
+            
+            # Detectar problemas comunes
+            problemas = []
+            if chrome_region_norm['left'] < 0:
+                problemas.append(\"Chrome está fuera del borde izquierdo de pantalla\")
+            if chrome_region_norm['top'] < 0:
+                problemas.append(\"Chrome está fuera del borde superior de pantalla\")
+            if chrome_region_norm['left'] + chrome_region_norm['width'] > 3000:
+                problemas.append(\"Chrome se extiende más allá del ancho esperado\")
+            if chrome_region_norm['top'] + chrome_region_norm['height'] > 2000:
+                problemas.append(\"Chrome se extiende más allá del alto esperado\")
+                
+            if problemas:
+                print(f\"\\n⚠️  PROBLEMAS DETECTADOS:\")
+                for problema in problemas:
+                    print(f\"   - {problema}\")
+                print(f\"\\n💡 SOLUCIONES RECOMENDADAS:\")
+                print(f\"   1. Ejecuta 'Normalizar ventana de Chrome' desde el menú\")
+                print(f\"   2. Asegúrate que Chrome esté visible y no minimizado\")
+                print(f\"   3. Cierra otras ventanas que puedan interferir\")
+            else:
+                print(f\"\\n✅ No se detectaron problemas obvios con Chrome\")
+                
+        except Exception as e:
+            print(f\"❌ Error durante diagnóstico: {e}\")
+            import traceback
+            traceback.print_exc()
+    
     def reset_calibration(self):
         """Limpia/resetea la calibración"""
         print("\n🗑️  RESETEAR CALIBRACIÓN")
@@ -1397,10 +1484,11 @@ def run_calibration():
         print("6. 🚀 AUTO-DETECTOR de 37 números (0-36)")
         print("7. Prueba rápida de captura (debug)")
         print("8. 🔧 Normalizar ventana de Chrome")
-        print("9. 🗑️  Limpiar/resetear calibración")
+        print("9. 🔍 Diagnosticar posición de Chrome")
+        print("10. 🗑️  Limpiar/resetear calibración")
         print("0. Salir")
         
-        choice = input("\nSelecciona una opción (0-9): ").strip()
+        choice = input("\nSelecciona una opción (0-10): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -1421,6 +1509,8 @@ def run_calibration():
         elif choice == '8':
             calibrator.normalize_chrome_only()
         elif choice == '9':
+            calibrator.diagnose_chrome_position()
+        elif choice == '10':
             calibrator.reset_calibration()
         elif choice == '0':
             print("👋 Hasta luego!")
