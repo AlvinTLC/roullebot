@@ -249,6 +249,10 @@ def main_fast():
         print("📋 Ejecuta primero: python roullebot.py --mode calibrate")
         return
     
+    # Usar regiones calibradas
+    region_numero = calibrator.calibration_data['winner_region']
+    region_countdown = calibrator.calibration_data.get('countdown_region')
+    
     try:
         region_chrome = obtener_region_chrome()
         print(f"✅ Chrome detectado: {region_chrome}")
@@ -266,10 +270,6 @@ def main_fast():
         import traceback
         traceback.print_exc()
         return
-    
-    # Usar regiones calibradas
-    region_numero = calibrator.calibration_data['winner_region']
-    region_countdown = calibrator.calibration_data.get('countdown_region')
     
     print(f"🎯 Winner region: x={region_numero['x']}, y={region_numero['y']}")
     if region_countdown:
