@@ -1,7 +1,12 @@
+# Core dependencies
 opencv-python~=4.11.0.86
 numpy~=2.2.6
 mss~=10.0.0
 pytesseract~=0.3.13
-
-PyGetWindow~=0.0.9
 PyAutoGUI~=0.9.54
+
+# Windows specific
+PyGetWindow~=0.0.9; sys_platform == 'win32'
+
+# Optional for better screen information
+screeninfo~=0.8.1

@@ -3,20 +3,18 @@ import time
 import numpy as np
 import pyautogui
 from datetime import datetime
+import sys
+import os
+import json
 
-def capture_screen(region):
-    # Use pyautogui to capture the actual screen region
-    screenshot = pyautogui.screenshot(region=(region['left'], region['top'], region['width'], region['height']))
-    img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-    return img
+# Añadir el directorio raíz al path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def obtener_region_chrome():
-    # Simulate obtaining the Chrome region
-    return {"left": 0, "top": 0, "width": 1920, "height": 1080}
-
-def detect_number_from_image(img):
-    # Simulate detecting a number from the image
-    return str(np.random.randint(0, 37))
+from vision.screen_capture import capturar_pantalla_region
+from vision.window_region import obtener_region_chrome
+from vision.detector import detect_number_from_image
+from config.platform_config import config
+from tools.calibrator import Calibrator
 
 def es_numero_valido_ruleta(numero_str):
     """Check if it is a valid roulette number (0-36)"""
@@ -26,20 +24,30 @@ def es_numero_valido_ruleta(numero_str):
     except:
         return False
 
-def apostar_al_24():
-    """Click on number 24 to bet"""
+def apostar_al_numero(numero='24', calibration_data=None):
+    """Click on specified number to bet"""
     try:
-        x, y = 3050, 605
+        if calibration_data and 'bet_positions' in calibration_data:
+            if str(numero) in calibration_data['bet_positions']:
+                pos = calibration_data['bet_positions'][str(numero)]
+                x, y = pos['x'], pos['y']
+            else:
+                print(f"⚠️  No hay calibración para el número {numero}, usando valores por defecto")
+                x, y = 3050, 605
+        else:
+            # Valores por defecto (ajustar según necesidad)
+            x, y = 3050, 605
+        
         pyautogui.click(x, y)
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"💰 [{timestamp}] ✅ BET PLACED on number 24")
+        print(f"💰 [{timestamp}] ✅ BET PLACED on number {numero}")
         return True
     except Exception as e:
         print(f"❌ Error placing bet: {e}")
         return False
 
 class DetectorGanadoresSimple:
-    def __init__(self):
+    def __init__(self, calibration_data=None):
         self.ultimo_ganador = None
         self.numero_candidato = None
         self.contador_confirmaciones = 0
@@ -50,6 +58,7 @@ class DetectorGanadoresSimple:
         self.numero_objetivo = 24
         self.esperando_apuesta = False
         self.tiempo_espera_inicio = None
+        self.calibration_data = calibration_data
 
     def procesar_numero(self, numero):
         """Process number and confirm winners"""
@@ -98,7 +107,7 @@ class DetectorGanadoresSimple:
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 print(f"🎯 [{timestamp}] TIME TO BET! (3 seconds completed)")
 
-                if apostar_al_24():
+                if apostar_al_numero(self.numero_objetivo, self.calibration_data):
                     self.total_apuestas += 1
                     timestamp_apuesta = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                     print(f"✅ [{timestamp_apuesta}] Bet #{self.total_apuestas} confirmed on number {self.numero_objetivo}")
@@ -149,35 +158,53 @@ class DetectorGanadoresSimple:
             print(f"\n⚠️ No bets were completed in this session")
 
 def main():
-    region_chrome = obtener_region_chrome()
-    print(f"🖥️ Chrome detected at: {region_chrome}")
-
-    region_numero = {
-        "left": 2850,
-        "top": 560,
-        "width": 80,
-        "height": 40
-    }
-
-    print(f"🎯 Monitoring ONLY winning number: {region_numero}")
-    print(f"💰 SIMPLIFIED SYSTEM:")
-    print(f"   1️⃣ Detect winning number")
-    print(f"   2️⃣ Wait 3 seconds")
-    print(f"   3️⃣ Automatically bet on 24")
-    print(f"🚀 MAXIMUM SPEED: ~50 FPS detection")
-    print(f"⏱️ Session started: {datetime.now().strftime('%H:%M:%S')}")
-    print(f"💡 Ctrl+C to finish and see summary")
+    print(f"🎰 RouletteBot - Sistema Automático de Apuestas")
+    print(f"🖥️  Sistema: {config.system.upper()}")
+    print("-" * 70)
+    
+    # Cargar calibración
+    calibrator = Calibrator()
+    if not calibrator.calibration_data.get('winner_region'):
+        print("❌ No hay calibración guardada.")
+        print("📋 Ejecuta primero: python roullebot.py --mode calibrate")
+        return
+    
+    try:
+        region_chrome = obtener_region_chrome()
+        print(f"✅ Chrome detectado en: {region_chrome}")
+    except Exception as e:
+        print(f"❌ Error detectando Chrome: {e}")
+        return
+    
+    # Usar región calibrada
+    region_numero = calibrator.calibration_data['winner_region']
+    
+    print(f"🎯 Monitoreando número ganador en: x={region_numero['x']}, y={region_numero['y']}")
+    print(f"💰 SISTEMA SIMPLIFICADO:")
+    print(f"   1️⃣ Detectar número ganador")
+    print(f"   2️⃣ Esperar 3 segundos")
+    print(f"   3️⃣ Apostar automáticamente al 24")
+    print(f"🚀 VELOCIDAD MÁXIMA: ~50 FPS de detección")
+    print(f"⏱️  Sesión iniciada: {datetime.now().strftime('%H:%M:%S')}")
+    print(f"💡 Ctrl+C para terminar y ver resumen")
     print("-" * 70)
 
-    detector = DetectorGanadoresSimple()
+    detector = DetectorGanadoresSimple(calibrator.calibration_data)
     contador_scans = 0
 
     pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.01
+    pyautogui.PAUSE = config.get_click_delay()
 
     try:
         while True:
-            img_ganador = capture_screen(region_numero)
+            # Capturar región usando el nuevo sistema
+            screenshot = capturar_pantalla_region({
+                'left': region_numero['x'],
+                'top': region_numero['y'],
+                'width': region_numero['width'],
+                'height': region_numero['height']
+            })
+            img_ganador = np.array(screenshot)
             contador_scans += 1
 
             if img_ganador is not None and img_ganador.size > 0:
@@ -189,7 +216,9 @@ def main():
 
             if contador_scans % 250 == 0:
                 if img_ganador is not None:
-                    preview = cv2.resize(img_ganador, (300, 300), interpolation=cv2.INTER_NEAREST)
+                    # Convertir a BGR para cv2
+                    img_bgr = cv2.cvtColor(img_ganador, cv2.COLOR_RGB2BGR)
+                    preview = cv2.resize(img_bgr, (300, 300), interpolation=cv2.INTER_NEAREST)
                     info_img = cv2.copyMakeBorder(preview, 0, 120, 0, 0, cv2.BORDER_CONSTANT, value=(50, 50, 50))
 
                     cv2.putText(info_img, f"Winner: {numero_ganador}", (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)

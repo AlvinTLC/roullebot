@@ -1,9 +1,17 @@
 import pytesseract
 import cv2
 import numpy as np
+import sys
+import os
 
-# ✅ Ruta para Windows — AJUSTA si está en otro lugar
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Añadir el directorio raíz al path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config.platform_config import config
+
+# Configurar Tesseract según la plataforma
+if config.tesseract_cmd and config.tesseract_cmd != 'tesseract':
+    pytesseract.pytesseract.tesseract_cmd = config.tesseract_cmd
 
 
 def preprocess_image(img):
