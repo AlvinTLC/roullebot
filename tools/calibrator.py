@@ -302,7 +302,6 @@ class Calibrator:
                     try:
                         if 0 <= mouse_x <= 3000 and 0 <= mouse_y <= 2000:
                             pyautogui.moveTo(mouse_x, mouse_y)
-                            import time
                             time.sleep(0.5)
                         else:
                             print(f"   ⚠️ Coordenadas fuera de rango: ({mouse_x}, {mouse_y})")
