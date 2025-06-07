@@ -85,6 +85,11 @@ Opciones de calibración:
 1. **Calibración visual completa** (recomendado): Click en las áreas indicadas
 2. **Calibrar posición específica**: Para números individuales
 3. **Probar calibración**: Verifica que la calibración funcione
+4. **Ver calibración guardada**: Muestra la configuración actual
+5. **Test de posiciones de apuesta**: Prueba moviendo el mouse
+6. **🚀 AUTO-DETECTOR de 37 números**: Detecta automáticamente todos los números
+7. **Prueba rápida de captura**: Debug de captura de regiones
+8. **🔧 Normalizar ventana de Chrome**: Ajusta tamaño y posición consistente
 
 ### Ejecutar el Bot
 
@@ -171,6 +176,21 @@ La configuración se guarda automáticamente en:
 - **Windows**: `%APPDATA%\roullebot\calibration.json`
 - **macOS**: `~/Library/Application Support/roullebot/calibration.json`
 - **Linux**: `~/.config/roullebot/calibration.json`
+
+### 🔧 Normalización de Ventana Chrome
+
+Para garantizar que las coordenadas calibradas funcionen correctamente, RouletteBot normaliza automáticamente la ventana de Chrome:
+
+- **Durante calibración**: Chrome se redimensiona automáticamente al tamaño óptimo
+- **Durante ejecución**: Chrome se normaliza para coincidir con la calibración
+- **Tamaño automático**: Se calcula según la resolución del monitor (75% del tamaño)
+- **Posición consistente**: Chrome se posiciona en la misma ubicación siempre
+
+**¿Por qué es importante?**
+- Garantiza que las coordenadas sean consistentes
+- Evita errores de "coordenadas fuera de rango"
+- Funciona en cualquier resolución de monitor
+- Mantiene la misma vista entre sesiones
 
 ## 🐛 Solución de Problemas
 

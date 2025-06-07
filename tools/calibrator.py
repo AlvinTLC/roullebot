@@ -101,8 +101,9 @@ class Calibrator:
         print("3. Presiona 't' para probar coordenadas, 's' para guardar, 'q' para salir")
         
         try:
-            chrome_region = obtener_region_chrome()
-            print(f"\n🔍 DEBUG CHROME REGION:")
+            # Normalizar Chrome durante calibración para consistencia
+            chrome_region = obtener_region_chrome(normalize=True)
+            print(f"\n🔍 CHROME REGION NORMALIZADA:")
             print(f"   left={chrome_region['left']}, top={chrome_region['top']}")
             print(f"   width={chrome_region['width']}, height={chrome_region['height']}")
         except Exception as e:
@@ -334,7 +335,8 @@ class Calibrator:
         print("3. Presiona 'q' para cancelar")
         
         try:
-            chrome_region = obtener_region_chrome()
+            # Usar la misma normalización para consistencia
+            chrome_region = obtener_region_chrome(normalize=True)
         except Exception as e:
             print(f"❌ Error: {e}")
             return
@@ -691,8 +693,9 @@ class Calibrator:
             print("⚠️ No hay región countdown calibrada")
         
         try:
-            chrome_region = obtener_region_chrome()
-            print(f"✅ Chrome detectado: {chrome_region}")
+            # Normalizar para prueba de captura consistente
+            chrome_region = obtener_region_chrome(normalize=True)
+            print(f"✅ Chrome detectado y normalizado: {chrome_region}")
         except Exception as e:
             print(f"❌ Error detectando Chrome: {e}")
             return
@@ -975,8 +978,9 @@ class Calibrator:
         print("5. El sistema detectará automáticamente los 36 números")
         
         try:
-            chrome_region = obtener_region_chrome()
-            print(f"\n✅ Chrome detectado: {chrome_region}")
+            # Normalizar Chrome para auto-detección consistente
+            chrome_region = obtener_region_chrome(normalize=True)
+            print(f"\n✅ Chrome detectado y normalizado: {chrome_region}")
         except Exception as e:
             print(f"❌ Error detectando Chrome: {e}")
             return
@@ -1233,6 +1237,66 @@ class Calibrator:
             pyautogui.FAILSAFE = original_failsafe
         
         print("✅ Test completado")
+    
+    def normalize_chrome_only(self):
+        """Normaliza la ventana de Chrome sin hacer calibración"""
+        print("\n🔧 NORMALIZACIÓN DE VENTANA DE CHROME")
+        print("=" * 50)
+        print("Esta función ajustará el tamaño y posición de Chrome para")
+        print("garantizar consistencia entre calibración y ejecución.")
+        print("")
+        
+        try:
+            # Mostrar información del monitor
+            from utils.window_manager import window_manager
+            monitors = window_manager.get_monitor_info()
+            if monitors:
+                primary = next((m for m in monitors if m.get('is_primary', False)), monitors[0])
+                print(f"📺 Monitor principal: {primary['width']}x{primary['height']}")
+            
+            # Obtener tamaño recomendado
+            target_width, target_height, target_x, target_y = window_manager.get_recommended_chrome_size()
+            print(f"🎯 Tamaño objetivo para Chrome:")
+            print(f"   Dimensiones: {target_width}x{target_height}")
+            print(f"   Posición: ({target_x}, {target_y})")
+            print("")
+            
+            # Buscar Chrome actual
+            current_window = window_manager.find_chrome_window()
+            if current_window:
+                print(f"🔍 Chrome actual:")
+                print(f"   Dimensiones: {current_window['width']}x{current_window['height']}")
+                print(f"   Posición: ({current_window['x']}, {current_window['y']})")
+            else:
+                print("❌ No se encontró ventana de Chrome abierta")
+                return
+            
+            # Preguntar confirmación
+            continuar = input("\n¿Proceder con la normalización? (s/n): ").strip().lower()
+            if continuar != 's':
+                print("❌ Normalización cancelada")
+                return
+            
+            # Normalizar
+            print("\n🔄 Normalizando ventana de Chrome...")
+            normalized_window = window_manager.normalize_chrome_window(
+                target_width, target_height, target_x, target_y
+            )
+            
+            if normalized_window:
+                print(f"\n✅ ¡Chrome normalizado exitosamente!")
+                print(f"   Nueva dimensión: {normalized_window['width']}x{normalized_window['height']}")
+                print(f"   Nueva posición: ({normalized_window['x']}, {normalized_window['y']})")
+                print("")
+                print("💡 Ahora Chrome tendrá el mismo tamaño que durante la calibración.")
+                print("💡 Esto garantiza que las coordenadas funcionen correctamente.")
+            else:
+                print("❌ No se pudo normalizar la ventana de Chrome")
+                
+        except Exception as e:
+            print(f"❌ Error durante normalización: {e}")
+            import traceback
+            traceback.print_exc()
 
 def run_calibration():
     """Función principal de calibración"""
@@ -1248,9 +1312,10 @@ def run_calibration():
         print("5. Test de posiciones de apuesta (mouse)")
         print("6. 🚀 AUTO-DETECTOR de 37 números (0-36)")
         print("7. Prueba rápida de captura (debug)")
-        print("8. Salir")
+        print("8. 🔧 Normalizar ventana de Chrome")
+        print("9. Salir")
         
-        choice = input("\nSelecciona una opción (1-8): ").strip()
+        choice = input("\nSelecciona una opción (1-9): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -1269,6 +1334,8 @@ def run_calibration():
         elif choice == '7':
             calibrator._test_screen_capture()
         elif choice == '8':
+            calibrator.normalize_chrome_only()
+        elif choice == '9':
             print("👋 Hasta luego!")
             break
         else:

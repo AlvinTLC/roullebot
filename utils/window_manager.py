@@ -217,6 +217,184 @@ class WindowManager:
             print(f"Error activando ventana: {e}")
         
         return False
+    
+    def normalize_chrome_window(self, target_width=1200, target_height=800, target_x=100, target_y=100) -> dict:
+        """Normaliza la ventana de Chrome a un tamaño y posición específicos"""
+        print(f"🔧 Normalizando ventana de Chrome...")
+        print(f"   Tamaño objetivo: {target_width}x{target_height}")
+        print(f"   Posición objetivo: ({target_x}, {target_y})")
+        
+        try:
+            if self.is_windows:
+                return self._normalize_chrome_windows(target_width, target_height, target_x, target_y)
+            elif self.is_mac:
+                return self._normalize_chrome_mac(target_width, target_height, target_x, target_y)
+            elif self.is_linux:
+                return self._normalize_chrome_linux(target_width, target_height, target_x, target_y)
+        except Exception as e:
+            print(f"❌ Error normalizando ventana: {e}")
+            
+        return None
+    
+    def _normalize_chrome_windows(self, width, height, x, y) -> dict:
+        """Normaliza Chrome en Windows"""
+        try:
+            import pygetwindow as gw
+            windows = gw.getWindowsWithTitle('Chrome')
+            if windows:
+                win = windows[0]
+                
+                # Activar y redimensionar
+                win.activate()
+                time.sleep(0.5)
+                
+                # Restaurar si está maximizada
+                if win.isMaximized:
+                    win.restore()
+                    time.sleep(0.3)
+                
+                # Redimensionar y mover
+                win.resizeTo(width, height)
+                time.sleep(0.2)
+                win.moveTo(x, y)
+                time.sleep(0.3)
+                
+                print(f"✅ Chrome normalizado en Windows")
+                return {
+                    'title': win.title,
+                    'x': win.left,
+                    'y': win.top,
+                    'width': win.width,
+                    'height': win.height
+                }
+        except Exception as e:
+            print(f"❌ Error normalizando Chrome en Windows: {e}")
+        return None
+    
+    def _normalize_chrome_mac(self, width, height, x, y) -> dict:
+        """Normaliza Chrome en macOS"""
+        try:
+            # Script AppleScript para redimensionar y mover Chrome
+            script = f'''
+            tell application "Google Chrome"
+                activate
+            end tell
+            
+            delay 0.5
+            
+            tell application "System Events"
+                tell process "Google Chrome"
+                    set frontWindow to front window
+                    set position of frontWindow to {{{x}, {y}}}
+                    set size of frontWindow to {{{width}, {height}}}
+                end tell
+            end tell
+            
+            delay 0.5
+            
+            tell application "System Events"
+                tell process "Google Chrome"
+                    set frontWindow to front window
+                    set windowPosition to position of frontWindow
+                    set windowSize to size of frontWindow
+                    return {{item 1 of windowPosition, item 2 of windowPosition, item 1 of windowSize, item 2 of windowSize}}
+                end tell
+            end tell
+            '''
+            
+            result = subprocess.run(['osascript', '-e', script], 
+                                  capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                parts = result.stdout.strip().split(', ')
+                if len(parts) >= 4:
+                    print(f"✅ Chrome normalizado en macOS")
+                    return {
+                        'title': 'Google Chrome',
+                        'x': int(parts[0]),
+                        'y': int(parts[1]),
+                        'width': int(parts[2]),
+                        'height': int(parts[3])
+                    }
+        except Exception as e:
+            print(f"❌ Error normalizando Chrome en macOS: {e}")
+        return None
+    
+    def _normalize_chrome_linux(self, width, height, x, y) -> dict:
+        """Normaliza Chrome en Linux"""
+        try:
+            # Buscar ventana de Chrome
+            result = subprocess.run(['xdotool', 'search', '--name', 'Chrome'], 
+                                  capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                window_ids = result.stdout.strip().split('\n')
+                if window_ids:
+                    window_id = window_ids[0]
+                    
+                    # Activar ventana
+                    subprocess.run(['xdotool', 'windowactivate', window_id])
+                    time.sleep(0.5)
+                    
+                    # Quitar maximización si existe
+                    subprocess.run(['xdotool', 'windowstate', '--remove', 'MAXIMIZED_HORZ', window_id])
+                    subprocess.run(['xdotool', 'windowstate', '--remove', 'MAXIMIZED_VERT', window_id])
+                    time.sleep(0.3)
+                    
+                    # Redimensionar y mover
+                    subprocess.run(['xdotool', 'windowsize', window_id, str(width), str(height)])
+                    time.sleep(0.2)
+                    subprocess.run(['xdotool', 'windowmove', window_id, str(x), str(y)])
+                    time.sleep(0.3)
+                    
+                    # Verificar nueva geometría
+                    geo_result = subprocess.run(['xdotool', 'getwindowgeometry', window_id],
+                                              capture_output=True, text=True)
+                    
+                    if geo_result.returncode == 0:
+                        lines = geo_result.stdout.strip().split('\n')
+                        position_match = re.search(r'Position: (\d+),(\d+)', lines[1])
+                        size_match = re.search(r'Geometry: (\d+)x(\d+)', lines[2])
+                        
+                        if position_match and size_match:
+                            print(f"✅ Chrome normalizado en Linux")
+                            return {
+                                'title': 'Google Chrome',
+                                'x': int(position_match.group(1)),
+                                'y': int(position_match.group(2)),
+                                'width': int(size_match.group(1)),
+                                'height': int(size_match.group(2))
+                            }
+        except Exception as e:
+            print(f"❌ Error normalizando Chrome en Linux: {e}")
+        return None
+    
+    def get_recommended_chrome_size(self) -> Tuple[int, int, int, int]:
+        """Obtiene tamaño y posición recomendados para Chrome según la resolución"""
+        monitors = self.get_monitor_info()
+        if monitors:
+            primary = next((m for m in monitors if m.get('is_primary', False)), monitors[0])
+            monitor_width = primary['width']
+            monitor_height = primary['height']
+            
+            # Calcular tamaño óptimo (75% del monitor)
+            target_width = int(monitor_width * 0.75)
+            target_height = int(monitor_height * 0.75)
+            
+            # Posición centrada
+            target_x = (monitor_width - target_width) // 4
+            target_y = (monitor_height - target_height) // 4
+            
+            # Ajustes mínimos y máximos
+            target_width = max(1000, min(target_width, 1600))
+            target_height = max(700, min(target_height, 1200))
+            target_x = max(50, target_x)
+            target_y = max(50, target_y)
+            
+            return target_width, target_height, target_x, target_y
+        
+        # Valores por defecto
+        return 1200, 800, 100, 100
 
 # Instancia global
 window_manager = WindowManager()

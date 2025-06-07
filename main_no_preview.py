@@ -272,8 +272,9 @@ def main_fast():
     region_countdown = calibrator.calibration_data.get('countdown_region')
     
     try:
-        region_chrome = obtener_region_chrome()
-        print(f"✅ Chrome detectado: {region_chrome}")
+        # Normalizar Chrome para consistencia con la calibración  
+        region_chrome = obtener_region_chrome(normalize=True)
+        print(f"✅ Chrome detectado y normalizado: {region_chrome}")
         
         # Test inicial de captura
         print("🧪 Testing initial capture...")

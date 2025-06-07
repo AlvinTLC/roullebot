@@ -333,8 +333,9 @@ def main():
             return
     
     try:
-        region_chrome = obtener_region_chrome()
-        print(f"✅ Chrome detectado en: {region_chrome}")
+        # Normalizar Chrome para consistencia con la calibración
+        region_chrome = obtener_region_chrome(normalize=True)
+        print(f"✅ Chrome detectado y normalizado: {region_chrome}")
     except Exception as e:
         print(f"❌ Error detectando Chrome: {e}")
         return
