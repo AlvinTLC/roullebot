@@ -12,7 +12,7 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vision.screen_capture import capturar_pantalla_region
+from vision.screen_capture import capture_screen
 from vision.detector import detect_number_from_image
 from vision.window_region import obtener_region_chrome
 from config.platform_config import config
@@ -38,7 +38,7 @@ class Monitor:
         self.stats['start_time'] = time.time()
         
         while True:
-            screenshot = capturar_pantalla_region(region)
+            screenshot = capture_screen(region)
             img = np.array(screenshot)
             img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             
@@ -82,7 +82,7 @@ class Monitor:
         try:
             while True:
                 # Capturar región ganadora
-                screenshot = capturar_pantalla_region(winner_region)
+                screenshot = capture_screen(winner_region)
                 img = np.array(screenshot)
                 winner = detect_number_from_image(img)
                 
@@ -91,7 +91,7 @@ class Monitor:
                 # Capturar countdown si está configurado
                 countdown = None
                 if countdown_region:
-                    screenshot_cd = capturar_pantalla_region(countdown_region)
+                    screenshot_cd = capture_screen(countdown_region)
                     img_cd = np.array(screenshot_cd)
                     countdown = detect_number_from_image(img_cd)
                 
@@ -142,7 +142,7 @@ class Monitor:
         
         while True:
             # Capturar pantalla completa de Chrome
-            screenshot = capturar_pantalla_region(chrome_region)
+            screenshot = capture_screen(chrome_region)
             img = np.array(screenshot)
             img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             

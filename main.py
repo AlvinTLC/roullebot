@@ -10,7 +10,7 @@ import json
 # Añadir el directorio raíz al path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from vision.screen_capture import capturar_pantalla_region
+from vision.screen_capture import capture_screen
 from vision.window_region import obtener_region_chrome
 from vision.detector import detect_number_from_image
 from config.platform_config import config
@@ -198,7 +198,7 @@ def main():
     try:
         while True:
             # Capturar región usando el nuevo sistema
-            screenshot = capturar_pantalla_region({
+            screenshot = capture_screen({
                 'left': region_numero['x'],
                 'top': region_numero['y'],
                 'width': region_numero['width'],

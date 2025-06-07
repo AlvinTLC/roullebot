@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vision.screen_capture import capturar_pantalla_region
+from vision.screen_capture import capture_screen
 from vision.window_region import obtener_region_chrome
 from config.platform_config import config
 
@@ -98,7 +98,7 @@ class Calibrator:
         
         while True:
             # Capturar pantalla
-            screenshot = capturar_pantalla_region(chrome_region)
+            screenshot = capture_screen(chrome_region)
             img = np.array(screenshot)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             
@@ -171,7 +171,7 @@ class Calibrator:
             mouse_x, mouse_y = pyautogui.position()
             
             # Capturar pantalla
-            screenshot = capturar_pantalla_region(chrome_region)
+            screenshot = capture_screen(chrome_region)
             img = np.array(screenshot)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             
@@ -228,7 +228,7 @@ class Calibrator:
             winner_region = self.calibration_data['winner_region']
             
             # Capturar pantalla de la región ganadora
-            screenshot = capturar_pantalla_region({
+            screenshot = capture_screen({
                 'left': winner_region['x'],
                 'top': winner_region['y'],
                 'width': winner_region['width'],

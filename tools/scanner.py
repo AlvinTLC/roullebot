@@ -12,7 +12,7 @@ from collections import Counter
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vision.screen_capture import capturar_pantalla_region
+from vision.screen_capture import capture_screen
 from vision.detector import detect_number_from_image
 from config.platform_config import config
 
@@ -42,7 +42,7 @@ class Scanner:
                     break
                 
                 # Capturar región
-                screenshot = capturar_pantalla_region(region)
+                screenshot = capture_screen(region)
                 img = np.array(screenshot)
                 
                 # Detectar número
@@ -103,7 +103,7 @@ class Scanner:
                 
                 for name, region in regions_dict.items():
                     # Capturar región
-                    screenshot = capturar_pantalla_region(region)
+                    screenshot = capture_screen(region)
                     img = np.array(screenshot)
                     
                     # Detectar contenido según el tipo
