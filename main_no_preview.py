@@ -25,22 +25,27 @@ def es_numero_valido_ruleta(numero_str):
         return False
 
 def apostar_al_numero(numero='24', calibration_data=None):
-    """Click on specified number to bet"""
+    """Click on specified number to bet with validation"""
     try:
         if calibration_data and 'bet_positions' in calibration_data:
             if str(numero) in calibration_data['bet_positions']:
                 pos = calibration_data['bet_positions'][str(numero)]
-                x, y = pos['x'], pos['y']
+                if pos and 'x' in pos and 'y' in pos:
+                    x, y = pos['x'], pos['y']
+                    print(f"🎯 Using calibration for #{numero}: ({x}, {y})")
+                else:
+                    print(f"⚠️  Invalid calibration for #{numero}, using defaults")
+                    x, y = 1645, 1415
             else:
-                print(f"⚠️  No hay calibración para el número {numero}, usando valores por defecto")
-                x, y = 3050, 605
+                print(f"⚠️  No calibration for #{numero}, using defaults")
+                x, y = 1645, 1415
         else:
-            # Valores por defecto (ajustar según necesidad)
-            x, y = 3050, 605
+            print(f"⚠️  No calibration data, using defaults")
+            x, y = 1645, 1415
         
         pyautogui.click(x, y)
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"💰 [{timestamp}] ✅ BET PLACED on number {numero}")
+        print(f"💰 [{timestamp}] ✅ BET PLACED #{numero} at ({x}, {y})")
         return True
     except Exception as e:
         print(f"❌ Error placing bet: {e}")
@@ -271,13 +276,28 @@ def main_fast():
         traceback.print_exc()
         return
     
-    print(f"🎯 Winner region: x={region_numero['x']}, y={region_numero['y']}")
+    # Mostrar información completa de calibración
+    print(f"📋 FAST MODE CALIBRATION:")
+    print(f"🎯 Winner: x={region_numero['x']}, y={region_numero['y']}, size={region_numero['width']}x{region_numero['height']}")
+    
     if region_countdown:
-        print(f"⏰ Countdown region: x={region_countdown['x']}, y={region_countdown['y']}")
-        print(f"💰 ULTRA FAST SYSTEM: Bet at countdown 10,8,6,4,2")
+        print(f"⏰ Countdown: x={region_countdown['x']}, y={region_countdown['y']}, size={region_countdown['width']}x{region_countdown['height']}")
+    
+    # Mostrar posiciones de apuesta
+    bet_positions = calibrator.calibration_data.get('bet_positions', {})
+    if bet_positions:
+        print(f"💰 Bet positions:")
+        for numero, pos in bet_positions.items():
+            if pos:
+                print(f"   #{numero}: ({pos['x']}, {pos['y']})")
     else:
-        print("⚠️ No countdown - using 2s delay mode")
-        print(f"💰 ULTRA FAST SYSTEM: Bet 2s after winner")
+        print(f"⚠️  No bet positions - using defaults")
+    
+    if region_countdown:
+        print(f"💰 ULTRA FAST SYSTEM: Bet at countdown 12,10,8,6")
+    else:
+        print("⚠️ No countdown - using 2.5s delay mode")
+        print(f"💰 ULTRA FAST SYSTEM: Bet 2.5s after winner")
     
     print(f"🚀 MAX SPEED: ~66 FPS detection")
     print(f"⏱️  Session started: {datetime.now().strftime('%H:%M:%S')}")

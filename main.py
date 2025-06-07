@@ -25,25 +25,39 @@ def es_numero_valido_ruleta(numero_str):
         return False
 
 def apostar_al_numero(numero='24', calibration_data=None):
-    """Click on specified number to bet"""
+    """Click on specified number to bet with validation"""
     try:
         if calibration_data and 'bet_positions' in calibration_data:
             if str(numero) in calibration_data['bet_positions']:
                 pos = calibration_data['bet_positions'][str(numero)]
-                x, y = pos['x'], pos['y']
+                if pos and 'x' in pos and 'y' in pos:
+                    x, y = pos['x'], pos['y']
+                    print(f"🎯 Usando calibración para #{numero}: ({x}, {y})")
+                else:
+                    print(f"⚠️  Calibración inválida para #{numero}, usando valores por defecto")
+                    x, y = 1645, 1415  # Coordenadas por defecto para 24
             else:
-                print(f"⚠️  No hay calibración para el número {numero}, usando valores por defecto")
-                x, y = 3050, 605
+                print(f"⚠️  No hay calibración para #{numero}, usando valores por defecto")
+                x, y = 1645, 1415  # Coordenadas por defecto para 24
         else:
-            # Valores por defecto (ajustar según necesidad)
-            x, y = 3050, 605
+            print(f"⚠️  No hay datos de calibración, usando valores por defecto")
+            x, y = 1645, 1415  # Coordenadas por defecto para 24
+        
+        # Mostrar dónde vamos a hacer click
+        print(f"🖱️  Haciendo click en: ({x}, {y})")
+        
+        # Opcional: mover mouse primero para debug visual
+        pyautogui.moveTo(x, y)
+        time.sleep(0.1)  # Breve pausa para ver el movimiento
         
         pyautogui.click(x, y)
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"💰 [{timestamp}] ✅ BET PLACED on number {numero}")
+        print(f"💰 [{timestamp}] ✅ BET PLACED on number {numero} at ({x}, {y})")
         return True
     except Exception as e:
         print(f"❌ Error placing bet: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 class DetectorGanadoresSimple:
@@ -310,20 +324,45 @@ def main():
     region_numero = calibrator.calibration_data['winner_region']
     region_countdown = calibrator.calibration_data.get('countdown_region')
     
-    print(f"🎯 Monitoreando número ganador en: x={region_numero['x']}, y={region_numero['y']}")
+    # Mostrar información completa de calibración
+    print(f"📋 CALIBRACIÓN CARGADA:")
+    print(f"🎯 Winner region: x={region_numero['x']}, y={region_numero['y']}, size={region_numero['width']}x{region_numero['height']}")
     
     if region_countdown:
-        print(f"⏰ Monitoreando countdown en: x={region_countdown['x']}, y={region_countdown['y']}")
+        print(f"⏰ Countdown region: x={region_countdown['x']}, y={region_countdown['y']}, size={region_countdown['width']}x{region_countdown['height']}")
+    
+    # Mostrar posiciones de apuesta disponibles
+    bet_positions = calibrator.calibration_data.get('bet_positions', {})
+    if bet_positions:
+        print(f"💰 Posiciones de apuesta calibradas:")
+        for numero, pos in bet_positions.items():
+            if pos:
+                print(f"   #{numero}: ({pos['x']}, {pos['y']})")
+    else:
+        print(f"⚠️  No hay posiciones de apuesta calibradas - usando valores por defecto")
+    
+    # Mostrar regiones adicionales si existen
+    if calibrator.calibration_data.get('balance_region'):
+        balance_region = calibrator.calibration_data['balance_region']
+        print(f"💵 Balance region: x={balance_region['x']}, y={balance_region['y']}")
+        
+    if calibrator.calibration_data.get('total_bet_region'):
+        total_bet_region = calibrator.calibration_data['total_bet_region']
+        print(f"💸 Total bet region: x={total_bet_region['x']}, y={total_bet_region['y']}")
+    
+    print("-" * 70)
+    
+    if region_countdown:
         print(f"💰 SISTEMA AUTOMÁTICO:")
         print(f"   1️⃣ Detectar número ganador")
         print(f"   2️⃣ Monitorear countdown")
-        print(f"   3️⃣ Apostar al 24 cuando countdown = 10")
+        print(f"   3️⃣ Apostar cuando countdown = 12,10,8,6")
     else:
-        print("⚠️ No hay región de countdown calibrada. Usando modo de espera de 3 segundos.")
+        print("⚠️ No hay región de countdown calibrada. Usando modo de espera de 2.5 segundos.")
         print(f"💰 SISTEMA SIMPLIFICADO:")
         print(f"   1️⃣ Detectar número ganador")
-        print(f"   2️⃣ Esperar 3 segundos") 
-        print(f"   3️⃣ Apostar automáticamente al 24")
+        print(f"   2️⃣ Esperar 2.5 segundos") 
+        print(f"   3️⃣ Apostar automáticamente")
     print(f"🚀 VELOCIDAD MÁXIMA: ~50 FPS de detección")
     print(f"⏱️  Sesión iniciada: {datetime.now().strftime('%H:%M:%S')}")
     print(f"💡 Ctrl+C para terminar y ver resumen")

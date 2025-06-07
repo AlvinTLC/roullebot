@@ -894,6 +894,25 @@ class Calibrator:
         print("✅ Prueba de captura completada")
 
 
+    def test_bet_positions(self):
+        """Prueba las posiciones de apuesta moviendo el mouse"""
+        if not self.calibration_data.get('bet_positions'):
+            print("❌ No hay posiciones de apuesta calibradas")
+            return
+            
+        print("\n🧪 PROBANDO POSICIONES DE APUESTA")
+        print("=" * 50)
+        print("El mouse se moverá a cada posición calibrada...")
+        
+        bet_positions = self.calibration_data['bet_positions']
+        for numero, pos in bet_positions.items():
+            if pos and 'x' in pos and 'y' in pos:
+                print(f"📍 Moviendo a número {numero}: ({pos['x']}, {pos['y']})")
+                pyautogui.moveTo(pos['x'], pos['y'])
+                time.sleep(1.5)
+                
+        print("✅ Test completado. ¿Las posiciones eran correctas?")
+
 def run_calibration():
     """Función principal de calibración"""
     calibrator = Calibrator()
@@ -905,10 +924,11 @@ def run_calibration():
         print("2. Calibrar posición de apuesta específica")
         print("3. Probar calibración actual")
         print("4. Ver calibración guardada")
-        print("5. Prueba rápida de captura (debug)")
-        print("6. Salir")
+        print("5. Test de posiciones de apuesta (mouse)")
+        print("6. Prueba rápida de captura (debug)")
+        print("7. Salir")
         
-        choice = input("\nSelecciona una opción (1-6): ").strip()
+        choice = input("\nSelecciona una opción (1-7): ").strip()
         
         if choice == '1':
             calibrator.calibrate_visual_click()
@@ -921,8 +941,10 @@ def run_calibration():
             print("\n📋 Calibración actual:")
             print(json.dumps(calibrator.calibration_data, indent=2))
         elif choice == '5':
-            calibrator._test_screen_capture()
+            calibrator.test_bet_positions()
         elif choice == '6':
+            calibrator._test_screen_capture()
+        elif choice == '7':
             print("👋 Hasta luego!")
             break
         else:
