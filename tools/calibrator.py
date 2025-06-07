@@ -437,6 +437,231 @@ class Calibrator:
         
         cv2.destroyAllWindows()
     
+    def test_calibration_simple(self):
+        """Versión simplificada del test para macOS"""
+        if not self.calibration_data.get('winner_region'):
+            print("❌ No hay calibración guardada. Ejecuta primero la calibración.")
+            return
+        
+        print("\n🧪 PROBANDO CALIBRACIÓN (Modo Simple)")
+        print("=" * 50)
+        print("Presiona Ctrl+C para salir\n")
+        
+        # Verificar si Chrome necesita normalización
+        try:
+            chrome_region = obtener_region_chrome(normalize=False)
+            print(f"🔍 Chrome detectado en: ({chrome_region['left']}, {chrome_region['top']})")
+            print(f"   Tamaño: {chrome_region['width']}x{chrome_region['height']}")
+            
+            # Siempre normalizar para test
+            print("\n🔄 Normalizando Chrome para el test...")
+            chrome_region_norm = obtener_region_chrome(normalize=True)
+            print(f"✅ Chrome normalizado: ({chrome_region_norm['left']}, {chrome_region_norm['top']})")
+            print(f"   Tamaño: {chrome_region_norm['width']}x{chrome_region_norm['height']}")
+            time.sleep(1)  # Dar tiempo para que se ajuste la ventana
+            
+        except Exception as e:
+            print(f"⚠️ Error detectando Chrome: {e}")
+            return
+        
+        region_numero = self.calibration_data['winner_region']
+        region_countdown = self.calibration_data.get('countdown_region')
+        
+        # Mostrar información detallada de las regiones
+        print(f"\n📍 REGIONES CALIBRADAS:")
+        print(f"   Winner region:")
+        print(f"     Posición: ({region_numero['x']}, {region_numero['y']})")
+        print(f"     Tamaño: {region_numero['width']}x{region_numero['height']}")
+        print(f"     Área: {region_numero['x']} a {region_numero['x'] + region_numero['width']}, "
+              f"{region_numero['y']} a {region_numero['y'] + region_numero['height']}")
+        
+        if region_countdown:
+            print(f"   Countdown region:")
+            print(f"     Posición: ({region_countdown['x']}, {region_countdown['y']})")
+            print(f"     Tamaño: {region_countdown['width']}x{region_countdown['height']}")
+        
+        # Verificar que las regiones estén dentro de la ventana de Chrome
+        region_fuera_chrome = (
+            region_numero['x'] < chrome_region_norm['left'] or 
+            region_numero['y'] < chrome_region_norm['top'] or 
+            region_numero['x'] + region_numero['width'] > chrome_region_norm['left'] + chrome_region_norm['width'] or 
+            region_numero['y'] + region_numero['height'] > chrome_region_norm['top'] + chrome_region_norm['height']
+        )
+        
+        if region_fuera_chrome:
+            print("\n❌ PROBLEMA DETECTADO: La región winner está fuera de la ventana de Chrome!")
+            print("   Esto indica que la calibración no coincide con la posición actual de Chrome.")
+            print(f"   Chrome actual: ({chrome_region_norm['left']}, {chrome_region_norm['top']}) - {chrome_region_norm['width']}x{chrome_region_norm['height']}")
+            print(f"   Región winner: ({region_numero['x']}, {region_numero['y']}) - {region_numero['width']}x{region_numero['height']}")
+            
+            # Ofrecer ajuste automático si tenemos la información del offset original
+            chrome_offset = self.calibration_data.get('chrome_offset', {})
+            if chrome_offset.get('x') is not None and chrome_offset.get('y') is not None:
+                old_chrome_x = chrome_offset['x']
+                old_chrome_y = chrome_offset['y']
+                new_chrome_x = chrome_region_norm['left']
+                new_chrome_y = chrome_region_norm['top']
+                
+                offset_x = new_chrome_x - old_chrome_x
+                offset_y = new_chrome_y - old_chrome_y
+                
+                print(f"\n🔧 AUTO-AJUSTE DISPONIBLE:")
+                print(f"   Chrome original: ({old_chrome_x}, {old_chrome_y})")
+                print(f"   Chrome actual: ({new_chrome_x}, {new_chrome_y})")
+                print(f"   Diferencia: ({offset_x:+d}, {offset_y:+d})")
+                print(f"   Región ajustada sería: ({region_numero['x'] + offset_x}, {region_numero['y'] + offset_y})")
+                
+                print("\n¿Quieres que ajuste automáticamente la calibración? (s/n)")
+                print("💡 Esto moverá todas las regiones según la nueva posición de Chrome.")
+                # Para modo no interactivo, hacer el ajuste automáticamente
+                print("🔧 Ajustando automáticamente...")
+                self._adjust_calibration_for_chrome_position(offset_x, offset_y)
+                print("✅ Calibración ajustada. Continuando con el test...")
+            else:
+                print("\n🔧 SOLUCIONES:")
+                print("   1. Ejecuta la opción 1 para recalibrar completamente")
+                print("   2. Ejecuta la opción 8 para normalizar Chrome y luego recalibra")
+                print("   3. Abre Chrome en la misma posición que cuando calibraste")
+                print("\n💡 La calibración fue hecha con Chrome en una posición diferente.")
+                print("   RouletteBot necesita que Chrome esté en la misma posición para funcionar.")
+                return
+        
+        from vision.detector import detect_number_from_image
+        
+        print("\n🎯 INICIANDO CAPTURA Y DETECCIÓN...")
+        print("   - Se capturará la región winner cada 100ms")
+        print("   - Se guardará una imagen de debug en la primera captura")
+        print("   - Verás el resultado OCR cada 10 capturas")
+        print("-" * 50)
+        
+        contador = 0
+        primera_vez = True
+        detecciones_exitosas = 0
+        ultimos_numeros = []
+        
+        try:
+            while True:
+                # Capturar winner
+                screenshot = capture_screen(region_numero)
+                img = np.array(screenshot)
+                
+                # Verificar que la imagen sea válida
+                if img.size == 0:
+                    print(f"\n❌ Error: Imagen vacía en captura #{contador}")
+                    break
+                
+                # Convertir a BGR para OpenCV
+                if len(img.shape) == 3 and img.shape[2] == 3:
+                    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                else:
+                    img_bgr = img
+                
+                numero = detect_number_from_image(img_bgr).strip()
+                
+                # Capturar countdown si existe
+                countdown = ""
+                if region_countdown:
+                    screenshot_cd = capture_screen(region_countdown)
+                    img_cd = np.array(screenshot_cd)
+                    if img_cd.size > 0:
+                        if len(img_cd.shape) == 3 and img_cd.shape[2] == 3:
+                            img_cd_bgr = cv2.cvtColor(img_cd, cv2.COLOR_RGB2BGR)
+                        else:
+                            img_cd_bgr = img_cd
+                        countdown = detect_number_from_image(img_cd_bgr).strip()
+                
+                contador += 1
+                
+                # Rastrear detecciones exitosas
+                if numero:
+                    detecciones_exitosas += 1
+                    if numero not in ultimos_numeros:
+                        ultimos_numeros.append(numero)
+                        if len(ultimos_numeros) > 5:
+                            ultimos_numeros.pop(0)
+                
+                # Primera vez, mostrar información detallada de debug
+                if primera_vez and contador == 1:
+                    print(f"\n🔍 DEBUG DETALLADO - Primera captura:")
+                    print(f"   Winner región capturada:")
+                    print(f"     Shape: {img.shape} (height, width, channels)")
+                    print(f"     Dtype: {img.dtype}")
+                    print(f"     Min/Max valores: {np.min(img)}/{np.max(img)}")
+                    print(f"     Brillo promedio: {np.mean(img):.1f}")
+                    print(f"     Desviación estándar: {np.std(img):.1f}")
+                    
+                    # Análisis de la imagen
+                    if np.mean(img) < 50:
+                        print("     ⚠️ Imagen muy oscura - posible problema de captura")
+                    elif np.mean(img) > 200:
+                        print("     ⚠️ Imagen muy clara - posible sobreexposición")
+                    if np.std(img) < 10:
+                        print("     ⚠️ Muy poco contraste - puede dificultar OCR")
+                    
+                    # Guardar múltiples versiones de debug
+                    debug_dir = os.path.dirname(os.path.abspath(__file__))
+                    
+                    # Original
+                    debug_path = os.path.join(debug_dir, "debug_test_winner_original.png")
+                    cv2.imwrite(debug_path, img_bgr)
+                    print(f"\n💾 Imágenes de debug guardadas:")
+                    print(f"   Original: {debug_path}")
+                    
+                    # Escala de grises
+                    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+                    debug_path_gray = os.path.join(debug_dir, "debug_test_winner_gray.png")
+                    cv2.imwrite(debug_path_gray, gray)
+                    print(f"   Escala de grises: {debug_path_gray}")
+                    
+                    # Con umbral
+                    _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+                    debug_path_thresh = os.path.join(debug_dir, "debug_test_winner_thresh.png")
+                    cv2.imwrite(debug_path_thresh, thresh)
+                    print(f"   Con umbral: {debug_path_thresh}")
+                    
+                    print(f"\n💡 Revisa estas imágenes para verificar qué está capturando el bot.")
+                    
+                    primera_vez = False
+                
+                # Mostrar resultado cada 10 capturas
+                if contador % 10 == 0:
+                    tasa_exito = (detecciones_exitosas / contador) * 100
+                    print(f"[{contador:4d}] Winner: '{numero:>2s}' | Countdown: '{countdown:>2s}' | "
+                          f"Tasa éxito: {tasa_exito:.1f}% | Últimos: {ultimos_numeros}")
+                
+                # Advertencias específicas
+                if contador == 50 and detecciones_exitosas == 0:
+                    print("\n⚠️ NO SE ESTÁ DETECTANDO NINGÚN NÚMERO después de 50 capturas.")
+                    print("\n🔍 DIAGNÓSTICO:")
+                    print("   1. Verifica que Chrome esté mostrando la ruleta")
+                    print("   2. Asegúrate que el área del número ganador sea visible")
+                    print("   3. Revisa las imágenes de debug guardadas")
+                    print("   4. Considera recalibrar con opción 1 del menú")
+                    print("\n💡 TIP: La calibración debe hacerse con Chrome normalizado.")
+                    print("   Usa la opción 8 del menú para normalizar Chrome antes de calibrar.")
+                
+                time.sleep(0.1)  # 10 FPS
+                
+        except KeyboardInterrupt:
+            print("\n🛑 Test detenido por el usuario")
+        except Exception as e:
+            print(f"\n❌ Error durante el test: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Resumen final
+        if contador > 0:
+            print("\n📊 RESUMEN DEL TEST:")
+            print(f"   Total capturas: {contador}")
+            print(f"   Detecciones exitosas: {detecciones_exitosas}")
+            print(f"   Tasa de éxito: {(detecciones_exitosas/contador)*100:.1f}%")
+            if ultimos_numeros:
+                print(f"   Números detectados: {', '.join(ultimos_numeros)}")
+            else:
+                print("   ❌ No se detectó ningún número")
+        
+        print("\n✅ Test finalizado")
+    
     def test_calibration(self):
         """Prueba la calibración actual con live preview y detección OCR"""
         if not self.calibration_data.get('winner_region'):
@@ -459,13 +684,21 @@ class Calibrator:
         main_window = 'Test Calibración - Live Preview'
         debug_window = 'OCR Debug'
         
-        cv2.namedWindow(main_window, cv2.WINDOW_NORMAL)
-        cv2.namedWindow(debug_window, cv2.WINDOW_NORMAL)
-        
-        # En macOS, posicionar ventanas para mejor visibilidad
+        # En macOS, crear ventanas con flags específicas
         if config.system == 'darwin':
+            cv2.namedWindow(main_window, cv2.WINDOW_AUTOSIZE)
+            cv2.namedWindow(debug_window, cv2.WINDOW_AUTOSIZE)
             cv2.moveWindow(main_window, 100, 100)
             cv2.moveWindow(debug_window, 700, 100)
+            # Forzar un primer draw para inicializar la ventana
+            dummy_img = np.zeros((500, 600, 3), dtype=np.uint8)
+            cv2.putText(dummy_img, "Inicializando...", (200, 250), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.imshow(main_window, dummy_img)
+            cv2.waitKey(100)  # Dar tiempo para que se inicialice
+        else:
+            cv2.namedWindow(main_window, cv2.WINDOW_NORMAL)
+            cv2.namedWindow(debug_window, cv2.WINDOW_NORMAL)
             cv2.resizeWindow(main_window, 600, 500)
         
         # Variables para ajuste dinámico
@@ -506,6 +739,9 @@ class Calibrator:
                 regions_backup[key] = self.calibration_data[key].copy()
         
         from vision.detector import detect_number_from_image, detect_number_debug
+        
+        # Variable para detectar si OpenCV está fallando en macOS
+        macos_display_error = False
         
         while True:
             # Obtener región activa
@@ -628,12 +864,27 @@ class Calibrator:
                                (combined.shape[1] - 80, 30), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                     
-                    cv2.imshow(main_window, combined)
-                    
-                    # Forzar actualización de ventana en macOS
-                    if config.system == 'darwin':
-                        cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 1)
-                        cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 0)
+                    # Intentar mostrar la imagen
+                    try:
+                        cv2.imshow(main_window, combined)
+                        
+                        # Forzar actualización de ventana en macOS
+                        if config.system == 'darwin':
+                            # Forzar refresh en macOS
+                            cv2.waitKey(1)
+                            # A veces en macOS necesitamos recrear la ventana
+                            if frame_count % 100 == 0:
+                                cv2.destroyWindow(main_window)
+                                cv2.namedWindow(main_window, cv2.WINDOW_AUTOSIZE)
+                                cv2.moveWindow(main_window, 100, 100)
+                            cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 1)
+                            cv2.setWindowProperty(main_window, cv2.WND_PROP_TOPMOST, 0)
+                    except Exception as e:
+                        if config.system == 'darwin' and not macos_display_error:
+                            macos_display_error = True
+                            print(f"⚠️ Error mostrando ventana en macOS: {e}")
+                            print("💡 Intenta ejecutar con: export OPENCV_VIDEOIO_PRIORITY_MSMF=0")
+                            print("💡 O instala opencv-python-headless: pip install opencv-python-headless")
                     
             except Exception as e:
                 print(f"Error capturando región: {e}")
@@ -1419,6 +1670,51 @@ class Calibrator:
             import traceback
             traceback.print_exc()
     
+    def _adjust_calibration_for_chrome_position(self, offset_x, offset_y):
+        """Ajusta toda la calibración según el nuevo offset de Chrome"""
+        print(f"🔧 Ajustando calibración con offset: ({offset_x:+d}, {offset_y:+d})")
+        
+        # Ajustar regiones principales
+        for region_key in ['winner_region', 'countdown_region', 'balance_region', 'total_bet_region', 'repeat_bet_region']:
+            region = self.calibration_data.get(region_key)
+            if region and isinstance(region, dict) and 'x' in region and 'y' in region:
+                old_x, old_y = region['x'], region['y']
+                region['x'] += offset_x
+                region['y'] += offset_y
+                print(f"   {region_key}: ({old_x}, {old_y}) → ({region['x']}, {region['y']})")
+        
+        # Ajustar posiciones de apuesta
+        bet_positions = self.calibration_data.get('bet_positions', {})
+        for numero, pos in bet_positions.items():
+            if pos and isinstance(pos, dict) and 'x' in pos and 'y' in pos:
+                old_x, old_y = pos['x'], pos['y']
+                pos['x'] += offset_x
+                pos['y'] += offset_y
+                print(f"   bet #{numero}: ({old_x}, {old_y}) → ({pos['x']}, {pos['y']})")
+        
+        # Ajustar posiciones de fichas
+        chip_regions = self.calibration_data.get('chip_regions', {})
+        for chip_value, pos in chip_regions.items():
+            if pos and isinstance(pos, dict) and 'x' in pos and 'y' in pos:
+                old_x, old_y = pos['x'], pos['y']
+                pos['x'] += offset_x
+                pos['y'] += offset_y
+                print(f"   chip ${chip_value}: ({old_x}, {old_y}) → ({pos['x']}, {pos['y']})")
+        
+        # Actualizar el chrome_offset
+        try:
+            chrome_region = obtener_region_chrome(normalize=False)
+            self.calibration_data['chrome_offset'] = {
+                'x': chrome_region['left'],
+                'y': chrome_region['top']
+            }
+        except:
+            pass
+        
+        # Guardar los cambios
+        self.save_calibration()
+        print("💾 Calibración ajustada y guardada")
+
     def reset_calibration(self):
         """Limpia/resetea la calibración"""
         print("\n🗑️  RESETEAR CALIBRACIÓN")
@@ -1495,7 +1791,18 @@ def run_calibration():
             number = input("Número a calibrar (default: 24): ").strip() or '24'
             calibrator.calibrate_bet_position(number)
         elif choice == '3':
-            calibrator.test_calibration()
+            if config.system == 'darwin':
+                # En macOS, preguntar qué versión usar
+                print("\n🍎 macOS detectado. Opciones de test:")
+                print("1. Test visual completo (puede mostrar ventana en blanco)")
+                print("2. Test simple sin ventana (solo consola)")
+                test_choice = input("Selecciona (1-2): ").strip()
+                if test_choice == '2':
+                    calibrator.test_calibration_simple()
+                else:
+                    calibrator.test_calibration()
+            else:
+                calibrator.test_calibration()
         elif choice == '4':
             print("\n📋 Calibración actual:")
             print(json.dumps(calibrator.calibration_data, indent=2))
