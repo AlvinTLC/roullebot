@@ -29,15 +29,26 @@ class Calibrator:
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    
+                    # Auto-escalar regiones si es Windows con resolución alta
+                    if config.is_windows and (config.resolution_info['is_2k'] or config.resolution_info['is_4k']):
+                        print(f"🔧 Auto-escalando calibración para {config.get_resolution_info()}")
+                        data = config.auto_scale_regions(data)
+                        
+                    return data
             except:
                 pass
+        
+        # Usar tamaño óptimo según resolución
+        optimal_width, optimal_height = config.get_optimal_capture_size()
         
         return {
             'winner_region': None,
             'countdown_region': None,
             'bet_positions': {},
-            'chrome_offset': {'x': 0, 'y': 0}
+            'chrome_offset': {'x': 0, 'y': 0},
+            'optimal_capture_size': {'width': optimal_width, 'height': optimal_height}
         }
     
     def save_calibration(self):
@@ -121,18 +132,21 @@ class Calibrator:
                 print("❌ Calibración cancelada")
                 break
             elif key == ord('s') and len(clicks) >= 3:
-                # Guardar calibración con áreas más grandes
+                # Usar tamaño óptimo según resolución
+                optimal_width, optimal_height = config.get_optimal_capture_size()
+                
+                # Guardar calibración con áreas auto-escaladas
                 self.calibration_data['winner_region'] = {
-                    'x': clicks[0]['abs_x'] - 50,
-                    'y': clicks[0]['abs_y'] - 35,
-                    'width': 100,
-                    'height': 70
+                    'x': clicks[0]['abs_x'] - optimal_width//2,
+                    'y': clicks[0]['abs_y'] - optimal_height//2,
+                    'width': optimal_width,
+                    'height': optimal_height
                 }
                 self.calibration_data['countdown_region'] = {
-                    'x': clicks[1]['abs_x'] - 50,
-                    'y': clicks[1]['abs_y'] - 35,
-                    'width': 100,
-                    'height': 70
+                    'x': clicks[1]['abs_x'] - optimal_width//2,
+                    'y': clicks[1]['abs_y'] - optimal_height//2,
+                    'width': optimal_width,
+                    'height': optimal_height
                 }
                 self.calibration_data['bet_positions'] = {
                     '24': {'x': clicks[2]['abs_x'], 'y': clicks[2]['abs_y']},

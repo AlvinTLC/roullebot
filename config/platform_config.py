@@ -13,6 +13,10 @@ class PlatformConfig:
         self.is_mac = self.system == 'darwin'
         self.is_linux = self.system == 'linux'
         
+        # Detección automática de resolución y DPI
+        self.resolution_info = self._detect_resolution()
+        self.dpi_scale = self._get_dpi_scale()
+        
         # Configuración de Tesseract
         self.tesseract_cmd = self._get_tesseract_path()
         
@@ -60,6 +64,74 @@ class PlatformConfig:
         elif self.is_linux:
             return 'xdotool'
         return 'none'
+    
+    def _detect_resolution(self) -> Dict[str, any]:
+        """Detecta automáticamente la resolución de la pantalla"""
+        resolution_info = {
+            'width': 1920,
+            'height': 1080,
+            'is_2k': False,
+            'is_4k': False,
+            'scale_factor': 1.0
+        }
+        
+        try:
+            if self.is_windows:
+                import tkinter as tk
+                root = tk.Tk()
+                width = root.winfo_screenwidth()
+                height = root.winfo_screenheight()
+                root.destroy()
+                
+                resolution_info['width'] = width
+                resolution_info['height'] = height
+                
+                # Detectar tipo de resolución
+                if width >= 2560 and height >= 1440:
+                    resolution_info['is_2k'] = True
+                    resolution_info['scale_factor'] = width / 1920
+                elif width >= 3840 and height >= 2160:
+                    resolution_info['is_4k'] = True
+                    resolution_info['scale_factor'] = width / 1920
+                    
+            elif self.is_mac:
+                import subprocess
+                result = subprocess.run(['system_profiler', 'SPDisplaysDataType'], 
+                                      capture_output=True, text=True)
+                # Parsear resolución de macOS
+                # Por ahora usar valores por defecto
+                pass
+                
+        except Exception as e:
+            print(f"⚠️ No se pudo detectar resolución automáticamente: {e}")
+            
+        return resolution_info
+    
+    def _get_dpi_scale(self) -> float:
+        """Obtiene el factor de escalado DPI en Windows"""
+        if not self.is_windows:
+            return 1.0
+            
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # Obtener DPI awareness
+            user32 = ctypes.windll.user32
+            user32.SetProcessDPIAware()
+            
+            # Obtener DPI del monitor principal
+            dc = user32.GetDC(0)
+            dpi = ctypes.windll.gdi32.GetDeviceCaps(dc, 88)  # LOGPIXELSX
+            user32.ReleaseDC(0, dc)
+            
+            # DPI estándar es 96
+            scale = dpi / 96.0
+            return scale
+            
+        except Exception as e:
+            print(f"⚠️ No se pudo obtener escala DPI: {e}")
+            return 1.0
     
     def _get_config_dir(self) -> Path:
         """Obtiene el directorio de configuración según el SO"""
@@ -193,6 +265,58 @@ class PlatformConfig:
             instructions['xdotool'] = "Instala con: sudo apt-get install xdotool"
             
         return instructions
+    
+    def get_resolution_info(self) -> str:
+        """Retorna información detallada de la resolución detectada"""
+        info = self.resolution_info
+        return (f"🖥️ Resolución: {info['width']}x{info['height']} "
+                f"({'2K' if info['is_2k'] else '4K' if info['is_4k'] else 'FullHD'}) "
+                f"| DPI Scale: {self.dpi_scale:.2f}x")
+    
+    def auto_scale_regions(self, regions: Dict) -> Dict:
+        """Escala automáticamente las regiones según la resolución detectada"""
+        if not self.is_windows or self.resolution_info['scale_factor'] == 1.0:
+            return regions
+            
+        scale = self.resolution_info['scale_factor']
+        dpi_scale = self.dpi_scale
+        total_scale = scale * dpi_scale
+        
+        scaled_regions = {}
+        for key, region in regions.items():
+            if isinstance(region, dict):
+                if 'x' in region and 'y' in region:
+                    # Región con coordenadas
+                    scaled_regions[key] = {
+                        'x': int(region['x'] * total_scale),
+                        'y': int(region['y'] * total_scale),
+                        'width': int(region.get('width', 100) * total_scale),
+                        'height': int(region.get('height', 70) * total_scale)
+                    }
+                elif key == 'bet_positions':
+                    # Posiciones de apuesta
+                    scaled_positions = {}
+                    for num, pos in region.items():
+                        scaled_positions[num] = {
+                            'x': int(pos['x'] * total_scale),
+                            'y': int(pos['y'] * total_scale)
+                        }
+                    scaled_regions[key] = scaled_positions
+                else:
+                    scaled_regions[key] = region
+            else:
+                scaled_regions[key] = region
+                
+        return scaled_regions
+    
+    def get_optimal_capture_size(self) -> Tuple[int, int]:
+        """Retorna el tamaño óptimo de captura según la resolución"""
+        if self.resolution_info['is_2k']:
+            return (133, 93)  # 33% más grande para 2K
+        elif self.resolution_info['is_4k']:
+            return (200, 140)  # 100% más grande para 4K
+        else:
+            return (100, 70)   # Tamaño estándar para FullHD
 
 # Instancia global de configuración
 config = PlatformConfig()

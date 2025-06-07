@@ -213,6 +213,7 @@ class DetectorGanadoresRapido:
 def main_fast():
     print(f"⚡ RouletteBot - MODO ULTRA RÁPIDO (SIN PREVIEW)")
     print(f"🖥️  Sistema: {config.system.upper()}")
+    print(f"📺 {config.get_resolution_info()}")
     print("=" * 60)
     
     # Optimizaciones máximas

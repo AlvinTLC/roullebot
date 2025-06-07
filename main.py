@@ -262,6 +262,7 @@ class DetectorGanadoresSimple:
 def main():
     print(f"🎰 RouletteBot - Sistema Automático de Apuestas")
     print(f"🖥️  Sistema: {config.system.upper()}")
+    print(f"📺 {config.get_resolution_info()}")
     print("-" * 70)
     
     # Optimizaciones específicas para Windows
