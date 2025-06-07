@@ -102,7 +102,7 @@ class DetectorGanadoresRapido:
 
         # Solo mostrar si cambió (evitar spam)
         if numero != self.ultimo_numero_detectado:
-            self.ultimo_numero_detectado = numero
+            self.ultimo_numero_detectado = str(numero) if numero is not None else ""
             self.contador_detecciones_validas += 1
 
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -150,7 +150,7 @@ class DetectorGanadoresRapido:
         
         # Solo mostrar si cambió
         if countdown_str != self.ultimo_countdown_detectado:
-            self.ultimo_countdown_detectado = countdown_str
+            self.ultimo_countdown_detectado = str(countdown_str) if countdown_str is not None else ""
         
         # Solo mostrar countdown crítico
         if self.ultimo_countdown != countdown and countdown <= 12:

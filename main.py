@@ -116,7 +116,7 @@ class DetectorGanadoresSimple:
         if numero != self.ultimo_numero_detectado:
             if self.debug_detecciones:
                 print(f"🔍 Número detectado: {numero}")
-            self.ultimo_numero_detectado = numero
+            self.ultimo_numero_detectado = str(numero) if numero is not None else ""
             self.contador_detecciones_validas += 1
 
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -167,7 +167,7 @@ class DetectorGanadoresSimple:
         if countdown_str != self.ultimo_countdown_detectado:
             if self.debug_detecciones and countdown <= 20:
                 print(f"⏰ Countdown detectado: {countdown}")
-            self.ultimo_countdown_detectado = countdown_str
+            self.ultimo_countdown_detectado = str(countdown_str) if countdown_str is not None else ""
         
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         
@@ -483,26 +483,30 @@ def main():
                     current_winner = numero_ganador if 'numero_ganador' in locals() and numero_ganador else detector.ultimo_numero_detectado
                     current_countdown = countdown_actual if 'countdown_actual' in locals() and countdown_actual else detector.ultimo_countdown
                     
+                    # Convertir countdown a string para verificación
+                    current_countdown_str = str(current_countdown) if current_countdown is not None else None
+                    
                     # Winner detectado (grande y prominente)
-                    winner_color = (0, 255, 0) if current_winner and current_winner.isdigit() else (0, 0, 255)
+                    current_winner_str = str(current_winner) if current_winner is not None else ""
+                    winner_color = (0, 255, 0) if current_winner_str and current_winner_str.isdigit() else (0, 0, 255)
                     cv2.putText(display_img, f"WINNER: {current_winner or 'N/A'}", (15, 310), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, winner_color, 2)
                     
                     # Countdown (prominente con estado de apuesta)
-                    if current_countdown and current_countdown.isdigit():
-                        countdown_num = int(current_countdown)
+                    if current_countdown_str and current_countdown_str.isdigit():
+                        countdown_num = int(current_countdown_str)
                         if countdown_num in [9, 8]:
                             countdown_color = (0, 255, 0)  # Verde - momento de apostar
-                            countdown_text = f"COUNTDOWN: {current_countdown} ⚡ BETTING TIME!"
+                            countdown_text = f"COUNTDOWN: {current_countdown_str} ⚡ BETTING TIME!"
                         elif countdown_num <= 15:
                             countdown_color = (0, 255, 255)  # Cian - preparándose
-                            countdown_text = f"COUNTDOWN: {current_countdown} 🔄 Waiting..."
+                            countdown_text = f"COUNTDOWN: {current_countdown_str} 🔄 Waiting..."
                         else:
                             countdown_color = (255, 255, 0)  # Amarillo - normal
-                            countdown_text = f"COUNTDOWN: {current_countdown}"
+                            countdown_text = f"COUNTDOWN: {current_countdown_str}"
                     else:
                         countdown_color = (255, 255, 0)
-                        countdown_text = f"COUNTDOWN: {current_countdown or 'N/A'}"
+                        countdown_text = f"COUNTDOWN: {current_countdown_str or 'N/A'}"
                     
                     cv2.putText(display_img, countdown_text, (15, 340), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, countdown_color, 2)
@@ -524,17 +528,17 @@ def main():
                     # Estado de apuestas (centro inferior)
                     if region_countdown:
                         if detector.puede_apostar:
-                            if current_countdown and current_countdown.isdigit():
-                                countdown_num = int(current_countdown)
+                            if current_countdown_str and current_countdown_str.isdigit():
+                                countdown_num = int(current_countdown_str)
                                 if countdown_num in [9, 8]:
                                     color = (0, 255, 0)
-                                    status_text = f"⚡ BETTING NOW! (countdown: {current_countdown})"
+                                    status_text = f"⚡ BETTING NOW! (countdown: {current_countdown_str})"
                                 elif countdown_num <= 15:
                                     color = (0, 255, 255)
-                                    status_text = f"🔄 Ready to bet at 8-9 (countdown: {current_countdown})"
+                                    status_text = f"🔄 Ready to bet at 8-9 (countdown: {current_countdown_str})"
                                 else:
                                     color = (200, 200, 200)
-                                    status_text = f"⏳ Waiting for countdown 8-9 (current: {current_countdown})"
+                                    status_text = f"⏳ Waiting for countdown 8-9 (current: {current_countdown_str})"
                             else:
                                 color = (200, 200, 200)
                                 status_text = "Waiting for countdown detection..."
