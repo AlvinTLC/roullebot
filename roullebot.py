@@ -73,7 +73,7 @@ def check_dependencies():
 def main():
     """Función principal del bot"""
     parser = argparse.ArgumentParser(description='RouletteBot - Bot de automatización de ruleta')
-    parser.add_argument('--mode', choices=['run', 'calibrate', 'scan', 'monitor', 'preview'],
+    parser.add_argument('--mode', choices=['run', 'fast', 'calibrate', 'scan', 'monitor', 'preview'],
                         default='run', help='Modo de operación')
     parser.add_argument('--debug', action='store_true', help='Activar modo debug')
     parser.add_argument('--dry-run', action='store_true', help='Ejecutar sin hacer clicks reales')
@@ -92,9 +92,14 @@ def main():
     
     # Importar módulos según el modo
     if args.mode == 'run':
-        print("\n🚀 Iniciando bot principal...")
+        print("\n🚀 Iniciando bot principal (CON PREVIEW)...")
         from main import main as run_main
         run_main()
+    
+    elif args.mode == 'fast':
+        print("\n⚡ Iniciando bot ultra rápido (SIN PREVIEW)...")
+        from main_no_preview import main_fast
+        main_fast()
     
     elif args.mode == 'calibrate':
         print("\n🎯 Iniciando modo calibración...")

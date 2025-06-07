@@ -87,9 +87,27 @@ Opciones de calibración:
 3. **Probar calibración**: Verifica que la calibración funcione
 
 ### Ejecutar el Bot
+
+#### Modo Normal (CON preview visual a 30 FPS)
 ```bash
 python roullebot.py --mode run
 ```
+- ✅ Preview visual en tiempo real
+- 📊 Estadísticas visuales completas  
+- 🎮 Controles interactivos (1-9, R, N, D)
+- ⚡ ~50 FPS de detección
+- 📺 Ventana de preview a 30 FPS
+
+#### Modo Ultra Rápido (SIN preview - máximo rendimiento)
+```bash
+python roullebot.py --mode fast
+```
+- 🚀 **Máximo rendimiento** - Sin ventanas visuales
+- ⚡ ~66 FPS de detección  
+- 📝 **Solo consola** - Output mínimo en terminal
+- 🎯 **Ultra agresivo** - Apuesta en countdown 10,8,6,4,2
+- 💻 **Optimizado para Windows** - Prioridad alta del proceso
+- 🎲 **Números aleatorios** automáticos
 
 ### Otros Modos
 
@@ -107,6 +125,20 @@ python roullebot.py --mode monitor
 ```bash
 python roullebot.py --mode preview
 ```
+
+## 🎮 Controles en Tiempo Real
+
+### Modo Normal (con preview)
+- **0-9**: Fijar número objetivo específico
+- **R**: Activar modo aleatorio  
+- **N**: Generar nuevo número aleatorio
+- **D**: Toggle debug mode (ON/OFF)
+- **Q**: Salir del programa
+
+### Modo Ultra Rápido (solo consola)
+- **R**: Activar modo aleatorio
+- **0-9**: Fijar número objetivo específico  
+- **Ctrl+C**: Salir del programa
 
 ## 🎯 Estructura del Proyecto
 

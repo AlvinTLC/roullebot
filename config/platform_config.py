@@ -97,7 +97,7 @@ class PlatformConfig:
                 'capture_method': 'mss',  # Más rápido en Windows
                 'opencv_threads': 4,      # Usar múltiples threads
                 'capture_interval': 0.02, # 50 FPS máximo
-                'preview_interval': 0.1,  # Preview cada 100ms
+                'preview_interval': 0.033,  # Preview a 30 FPS (1/30 = 0.033s)
                 'ocr_threads': 2,         # OCR en paralelo
                 'resize_before_ocr': True,# Redimensionar antes de OCR
                 'skip_frames': 2,         # Procesar 1 de cada 2 frames
