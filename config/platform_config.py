@@ -319,13 +319,13 @@ class PlatformConfig:
             return (100, 70)   # Tamaño estándar para FullHD
     
     def get_optimal_countdown_size(self) -> Tuple[int, int]:
-        """Retorna el tamaño óptimo para countdown (ligeramente más grande)"""
+        """Retorna el tamaño óptimo para countdown (más cuadrado y pequeño)"""
         if self.resolution_info['is_2k']:
-            return (145, 100)  # Moderadamente más grande para countdown en 2K
+            return (90, 90)    # Cuadrado para 2K
         elif self.resolution_info['is_4k']:
-            return (220, 150)  # Moderadamente más grande para countdown en 4K
+            return (120, 120)  # Cuadrado para 4K
         else:
-            return (110, 80)   # 10% más grande que winner para FullHD
+            return (70, 70)    # Cuadrado pequeño para FullHD
 
 # Instancia global de configuración
 config = PlatformConfig()

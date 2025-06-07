@@ -185,6 +185,10 @@ Para garantizar que las coordenadas calibradas funcionen correctamente, Roulette
 - **Durante ejecución**: Chrome se normaliza para coincidir con la calibración
 - **Tamaño automático**: Se calcula según la resolución del monitor (75% del tamaño)
 - **Posición consistente**: Chrome se posiciona en la misma ubicación siempre
+- **Áreas optimizadas**: 
+  - Región ganadora: Rectangular optimizada para números
+  - Región countdown: **Cuadrada pequeña (70x70 px en FullHD)**
+  - Otras regiones: Tamaños específicos según función
 
 **¿Por qué es importante?**
 - Garantiza que las coordenadas sean consistentes
