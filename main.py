@@ -327,6 +327,15 @@ def main():
     # Cargar calibración
     print("\n📋 CARGANDO CALIBRACIÓN...")
     print("-" * 50)
+    
+    # DEBUG: Mostrar factor de escala
+    print(f"🔍 DEBUG Escalado:")
+    print(f"   Sistema: {config.system}")
+    print(f"   Es Windows: {config.is_windows}")
+    print(f"   Es 2K: {config.resolution_info['is_2k']}")
+    print(f"   Factor de escala: {config.resolution_info.get('scale_factor', 1.0)}")
+    print(f"   DPI Scale: {config.dpi_scale}")
+    
     calibrator = Calibrator()
     
     # Verificar que se cargó correctamente
@@ -447,7 +456,14 @@ def main():
                         center_y = region_numero['y'] + region_numero['height'] // 2
                         
                         # Usar tamaño optimizado según resolución (igual que calibrador)
-                        optimal_width, optimal_height = config.get_optimal_capture_size()
+                        # NOTA: En Windows 2K, usar el tamaño ya escalado de la calibración
+                        if config.is_windows and config.resolution_info['is_2k']:
+                            # Usar el tamaño ya escalado
+                            optimal_width = region_numero['width']
+                            optimal_height = region_numero['height']
+                            print(f"🔧 Usando tamaño escalado para 2K: {optimal_width}x{optimal_height}")
+                        else:
+                            optimal_width, optimal_height = config.get_optimal_capture_size()
                         
                         # Actualizar variable global para preview
                         adjusted_winner_region = {
@@ -463,6 +479,20 @@ def main():
                             print(f"   Original: ({region_numero['x']}, {region_numero['y']}) {region_numero['width']}x{region_numero['height']}")
                             print(f"   Center: ({center_x}, {center_y})")
                             print(f"   Adjusted: ({adjusted_winner_region['left']}, {adjusted_winner_region['top']}) {adjusted_winner_region['width']}x{adjusted_winner_region['height']}")
+                            
+                            # EXPERIMENTO: Probar captura sin ajuste cada 1000 frames
+                            if contador_scans % 1000 == 0:
+                                print(f"🧪 EXPERIMENTO: Probando captura directa sin ajuste...")
+                                test_region = {
+                                    'left': region_numero['x'],
+                                    'top': region_numero['y'],
+                                    'width': region_numero['width'],
+                                    'height': region_numero['height']
+                                }
+                                test_screenshot = capture_screen(test_region)
+                                test_img = np.array(test_screenshot)
+                                test_numero = detect_number_from_image(test_img).strip()
+                                print(f"   Resultado sin ajuste: '{test_numero}' (size: {test_img.shape})")
                         
                         screenshot = capture_screen(adjusted_winner_region)
                         img_ganador = np.array(screenshot)
@@ -473,9 +503,21 @@ def main():
                         if img_ganador is not None and img_ganador.size > 0:
                             numero_ganador = detect_number_from_image(img_ganador).strip()
                             
-                            # DEBUG: Mostrar resultado OCR cada 200 frames
+                            # DEBUG: Mostrar resultado OCR y guardar imagen de debug
                             if contador_scans % 200 == 0:
                                 print(f"🔍 DEBUG OCR: '{numero_ganador}' (size: {img_ganador.shape})")
+                                # Estadísticas de imagen
+                                mean_val = np.mean(img_ganador)
+                                std_val = np.std(img_ganador)
+                                print(f"   Brillo promedio: {mean_val:.1f}, Desv. estándar: {std_val:.1f}")
+                                
+                                # Guardar imagen de debug para análisis
+                                if contador_scans == 200:  # Solo la primera vez
+                                    import os
+                                    debug_path = os.path.join(os.path.dirname(__file__), f"debug_winner_{contador_scans}.png")
+                                    cv2.imwrite(debug_path, img_ganador)
+                                    print(f"💾 Imagen debug guardada en: {debug_path}")
+                                    print(f"   Revisa esta imagen para ver qué está capturando")
                                 
                             if numero_ganador:
                                 detector.procesar_numero(numero_ganador)
