@@ -280,6 +280,9 @@ class Calibrator:
         print("  '3': Región pequeña (60x40) - Original")
         print("  '4': Región extra pequeña (40x30)")
         print("  'd': Activar/desactivar debug OCR")
+        print("  'FLECHAS': Mover región winner (←↑→↓)")
+        print("  'WAFS': Mover región winner (alternativo)")
+        print("  'g': Guardar posición actual")
         
         # Configurar ventanas específicas para macOS
         main_window = 'Test Calibración - Live Preview'
@@ -305,11 +308,15 @@ class Calibrator:
         debug_mode = False
         frame_count = 0
         
+        # Variables para mover región
+        move_step = 5  # Pixeles por movimiento
+        region_modified = False
+        
         from vision.detector import detect_number_from_image, detect_number_debug
         
         while True:
-            # Capturar regiones calibradas
-            winner_region = self.calibration_data['winner_region']
+            # Capturar regiones calibradas (usar copia para poder modificar)
+            winner_region = self.calibration_data['winner_region'].copy()
             size = region_sizes[current_size]
             
             # Ajustar región para centrarla mejor
@@ -384,6 +391,15 @@ class Calibrator:
                     cv2.putText(combined, f"Debug: {'ON' if debug_mode else 'OFF'} | 1-4: Tamaño | D: Debug | Q: Salir", 
                                (10, y_text + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
                     
+                    # Mostrar controles de movimiento
+                    cv2.putText(combined, f"Mover: FLECHAS o WAFS | G: Guardar", 
+                               (10, y_text + 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 255, 100), 1)
+                    
+                    # Indicador de modificación
+                    if region_modified:
+                        cv2.putText(combined, "REGION MODIFICADA - Presiona G para guardar", 
+                                   (10, y_text + 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                    
                     cv2.imshow(main_window, combined)
                     
                     # Forzar actualización de ventana en macOS
@@ -427,6 +443,27 @@ class Calibrator:
             elif key == ord('d'):
                 debug_mode = not debug_mode
                 print(f"✅ Debug mode: {'ON' if debug_mode else 'OFF'}")
+            elif key == ord('g'):
+                # Guardar posición actual
+                self.save_calibration()
+                print(f"💾 Calibración guardada! Posición: x={winner_region['x']}, y={winner_region['y']}")
+            # Teclas de flecha (códigos especiales para OpenCV en macOS)
+            elif key == 63234 or key == ord('a'):  # Flecha izquierda o 'a' (macOS)
+                self.calibration_data['winner_region']['x'] -= move_step
+                region_modified = True
+                print(f"⬅️ Movido izquierda: x={self.calibration_data['winner_region']['x']}")
+            elif key == 63235 or key == ord('f'):  # Flecha derecha o 'f' (macOS)
+                self.calibration_data['winner_region']['x'] += move_step
+                region_modified = True
+                print(f"➡️ Movido derecha: x={self.calibration_data['winner_region']['x']}")
+            elif key == 63232 or key == ord('w'):  # Flecha arriba o 'w' (macOS)
+                self.calibration_data['winner_region']['y'] -= move_step
+                region_modified = True
+                print(f"⬆️ Movido arriba: y={self.calibration_data['winner_region']['y']}")
+            elif key == 63233 or key == ord('s'):  # Flecha abajo o 's' (macOS)
+                self.calibration_data['winner_region']['y'] += move_step
+                region_modified = True
+                print(f"⬇️ Movido abajo: y={self.calibration_data['winner_region']['y']}")
             elif key != 255:  # Cualquier otra tecla (para debug)
                 print(f"🔍 Tecla presionada: {key} (char: {chr(key) if 32 <= key <= 126 else 'special'})")
         
